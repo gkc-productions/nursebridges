@@ -1,0 +1,6 @@
+{
+  "apiBaseUrl": "https://api.nursebridges.com",
+  "adminBaseUrl": "https://admin.nursebridges.com",
+  "supabaseUrl": "REPLACE_IN_PHASE_C",
+  "supabaseAnonKey": "REPLACE_IN_PHASE_C"
+}

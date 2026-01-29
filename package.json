@@ -1,0 +1,22 @@
+{
+  "name": "nursebridge",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm -r dev",
+    "dev:api": "pnpm --filter @nursebridge/api dev",
+    "dev:admin": "pnpm --filter @nursebridge/admin dev",
+    "dev:mobile": "pnpm --filter @nursebridge/mobile dev",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "supabase": "^2.72.8"
+  }
+}

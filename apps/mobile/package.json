@@ -1,0 +1,27 @@
+{
+  "name": "@nursebridge/mobile",
+  "private": true,
+  "version": "0.0.1",
+  "main": "index.js",
+  "scripts": {
+    "dev": "expo start",
+    "lint": "echo \"(add eslint later)\"",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"(no tests)\""
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^1.24.0",
+    "@supabase/supabase-js": "^2.56.0",
+    "expo": "~54.0.0",
+    "expo-clipboard": "~7.0.0",
+    "expo-constants": "~18.0.0",
+    "expo-secure-store": "~13.0.1",
+    "react": "19.1.0",
+    "react-native": "0.81.0",
+    "react-native-url-polyfill": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "typescript": "^5.7.3"
+  }
+}

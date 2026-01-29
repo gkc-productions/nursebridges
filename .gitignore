@@ -1,0 +1,20 @@
+node_modules
+.pnpm-store
+.DS_Store
+
+# Expo
+apps/mobile/.expo
+apps/mobile/dist
+apps/mobile/web-build
+
+# Next
+apps/admin/.next
+apps/admin/out
+
+# Logs
+*.log
+
+# Env
+.env
+.env.*
+!.env.example

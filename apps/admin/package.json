@@ -1,0 +1,19 @@
+{
+  "name": "@nursebridge/admin",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"(no tests)\""
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.93.1",
+    "next": "^16.1.5",
+    "react": "19.2.4",
+    "react-dom": "^19.2.4"
+  }
+}
