@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { adminFetch, getAdminAccessToken } from "../../lib/adminAuthClient";
+import { adminFetch } from "../../lib/adminAuthClient";
 
 type NurseRow = {
   id: string;
   license_number: string | null;
   verified: boolean;
+  verification_status: string;
+  verified_at: string | null;
   profile_name: string | null;
   profile_phone: string | null;
   created_at: string;
@@ -18,47 +20,44 @@ export default function NursesPage() {
   const [loading, setLoading] = useState(false);
 
   const load = async () => {
-    const token = getAdminAccessToken();
-    if (!token) {
-      setError("Please sign in.");
-      return;
+    try {
+      const res = await adminFetch("/api/admin/nurses");
+
+      if (!res.ok) {
+        setError("Unable to load nurses.");
+        return;
+      }
+
+      const data = (await res.json()) as NurseRow[];
+      setNurses(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load nurses.");
     }
-
-    const res = await adminFetch("/api/admin/nurses");
-
-    if (!res.ok) {
-      setError("Unable to load nurses.");
-      return;
-    }
-
-    const data = (await res.json()) as NurseRow[];
-    setNurses(data);
   };
 
   useEffect(() => {
     void load();
   }, []);
 
-  const updateVerification = async (id: string, verified: boolean) => {
-    const token = getAdminAccessToken();
-    if (!token) {
-      setError("Please sign in.");
-      return;
-    }
-
+  const updateVerification = async (id: string, status: "approved" | "rejected") => {
     setLoading(true);
-    const res = await adminFetch("/api/admin/nurses/verify", {
-      method: "POST",
-      body: JSON.stringify({ nurse_id: id, verified })
-    });
-    setLoading(false);
+    try {
+      const res = await adminFetch("/api/admin/nurses/verify", {
+        method: "POST",
+        body: JSON.stringify({ nurse_id: id, status })
+      });
 
-    if (!res.ok) {
-      setError("Unable to update verification.");
-      return;
+      if (!res.ok) {
+        setError("Unable to update verification.");
+        return;
+      }
+
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to update verification.");
+    } finally {
+      setLoading(false);
     }
-
-    await load();
   };
 
   return (
@@ -71,7 +70,7 @@ export default function NursesPage() {
             <th>Name</th>
             <th>License #</th>
             <th>Status</th>
-            <th>Joined</th>
+            <th>Verified At</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -81,16 +80,23 @@ export default function NursesPage() {
               <td>{nurse.profile_name ?? "-"}</td>
               <td>{nurse.license_number ?? "-"}</td>
               <td>
-                <span className="badge">{nurse.verified ? "Verified" : "Pending"}</span>
+                <span className="badge">{nurse.verification_status}</span>
               </td>
-              <td>{new Date(nurse.created_at).toLocaleDateString()}</td>
+              <td>{nurse.verified_at ? new Date(nurse.verified_at).toLocaleDateString() : "-"}</td>
               <td>
                 <button
-                  className={`button ${nurse.verified ? "secondary" : ""}`}
-                  onClick={() => updateVerification(nurse.id, !nurse.verified)}
+                  className="button"
+                  onClick={() => updateVerification(nurse.id, "approved")}
                   disabled={loading}
                 >
-                  {nurse.verified ? "Unverify" : "Verify"}
+                  Approve
+                </button>
+                <button
+                  className="button secondary"
+                  onClick={() => updateVerification(nurse.id, "rejected")}
+                  disabled={loading}
+                >
+                  Reject
                 </button>
               </td>
             </tr>

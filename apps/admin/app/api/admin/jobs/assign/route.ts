@@ -20,19 +20,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: jobError?.message ?? "job_not_found" }, { status: 400 });
   }
 
-  const { error: applicationError } = await supabaseAdmin
+  const { error: acceptError } = await supabaseAdmin
     .from("applications")
-    .upsert(
-      {
-        job_id: body.job_id,
-        nurse_user_id: body.nurse_id,
-        status: "accepted"
-      },
-      { onConflict: "job_id,nurse_user_id" }
-    );
+    .update({ status: "accepted" })
+    .eq("job_id", body.job_id)
+    .eq("nurse_user_id", body.nurse_id);
 
-  if (applicationError) {
-    return NextResponse.json({ error: applicationError.message }, { status: 400 });
+  if (acceptError) {
+    return NextResponse.json({ error: acceptError.message }, { status: 400 });
+  }
+
+  const { error: rejectError } = await supabaseAdmin
+    .from("applications")
+    .update({ status: "rejected" })
+    .eq("job_id", body.job_id)
+    .neq("nurse_user_id", body.nurse_id);
+
+  if (rejectError) {
+    return NextResponse.json({ error: rejectError.message }, { status: 400 });
   }
 
   const { error: jobUpdateError } = await supabaseAdmin
@@ -43,6 +48,14 @@ export async function POST(request: NextRequest) {
   if (jobUpdateError) {
     return NextResponse.json({ error: jobUpdateError.message }, { status: 400 });
   }
+
+  await supabaseAdmin.from("admin_audit_logs").insert({
+    actor_id: auth.user.id,
+    action: "job_assigned",
+    entity_type: "job",
+    entity_id: body.job_id,
+    metadata: { nurse_user_id: body.nurse_id }
+  });
 
   return NextResponse.json({ ok: true });
 }

@@ -5,7 +5,8 @@ import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
 type NurseRow = {
   nurse_id: string;
   license_number: string | null;
-  verified: boolean | null;
+  verification_status: string | null;
+  verified_at: string | null;
   created_at: string;
 };
 
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   const { data: nurseRows, error } = await supabaseAdmin
     .from("nurse_profiles")
-    .select("nurse_id,license_number,verified,created_at")
+    .select("nurse_id,license_number,verification_status,verified_at,created_at")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -42,7 +43,9 @@ export async function GET(request: NextRequest) {
     return {
       id: row.nurse_id,
       license_number: row.license_number ?? null,
-      verified: row.verified ?? false,
+      verified: row.verification_status === "approved",
+      verification_status: row.verification_status ?? "pending",
+      verified_at: row.verified_at,
       profile_name: profile?.full_name ?? null,
       profile_phone: profile?.phone ?? null,
       created_at: row.created_at

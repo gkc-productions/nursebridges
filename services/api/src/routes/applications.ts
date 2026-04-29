@@ -19,12 +19,11 @@ export async function applicationRoutes(app: FastifyInstance) {
         .order("created_at", { ascending: false })
         .limit(100);
 
-      if (error) return reply.code(400).send({ ok: false, error: error.message });
-      return reply.send({ ok: true, applications: data ?? [] });
+      if (error) return reply.code(400).send({ error: error.message });
+      return reply.send({ applications: data ?? [] });
     }
 
     if (authed.role === "patient") {
-      // join by jobs (patient owns job)
       const { data, error } = await sb
         .from("applications")
         .select("*, jobs!inner(patient_user_id)")
@@ -32,12 +31,11 @@ export async function applicationRoutes(app: FastifyInstance) {
         .order("created_at", { ascending: false })
         .limit(100);
 
-      if (error) return reply.code(400).send({ ok: false, error: error.message });
-      return reply.send({ ok: true, applications: data ?? [] });
+      if (error) return reply.code(400).send({ error: error.message });
+      return reply.send({ applications: data ?? [] });
     }
 
-    // admin (later)
-    return reply.code(403).send({ ok: false, error: "Admin listing not enabled in Phase C core routes" });
+    return reply.code(403).send({ error: "Forbidden" });
   });
 
   // Patient decides application (accept/reject) for their job
@@ -49,7 +47,6 @@ export async function applicationRoutes(app: FastifyInstance) {
     const body = decideApplicationSchema.parse(req.body ?? {});
     const sb = supabaseForUser(authed.jwt);
 
-    // Ensure application belongs to a job owned by this patient
     const { data: appRow, error: appErr } = await sb
       .from("applications")
       .select("id, job_id, nurse_user_id, status, jobs!inner(patient_user_id)")
@@ -57,7 +54,7 @@ export async function applicationRoutes(app: FastifyInstance) {
       .eq("jobs.patient_user_id", authed.userId)
       .single();
 
-    if (appErr || !appRow) return reply.code(404).send({ ok: false, error: "Application not found or not accessible" });
+    if (appErr || !appRow) return reply.code(404).send({ error: "Application not found" });
 
     const nextStatus = body.decision === "accept" ? "accepted" : "rejected";
 
@@ -68,7 +65,7 @@ export async function applicationRoutes(app: FastifyInstance) {
       .select("*")
       .single();
 
-    if (error) return reply.code(400).send({ ok: false, error: error.message });
-    return reply.send({ ok: true, application: data });
+    if (error) return reply.code(400).send({ error: error.message });
+    return reply.send({ application: data });
   });
 }

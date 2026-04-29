@@ -30,23 +30,39 @@ export function getAdminAccessToken(): string | null {
   return t ? cleanToken(t) : null;
 }
 
+export async function signOutAdmin() {
+  setAdminAccessToken(null);
+  await supabaseClient.auth.signOut();
+}
+
 export async function adminFetch(path: string, init: RequestInit = {}) {
   const token = getAdminAccessToken();
+  if (!token) {
+    throw new Error("Missing admin token");
+  }
+
   const headers = new Headers(init.headers || {});
   if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  return fetch(path, { ...init, headers });
+  headers.set("Authorization", `Bearer ${token}`);
+
+  const res = await fetch(path, { ...init, headers });
+
+  if (res.status >= 400) {
+    console.error("Admin request failed", { path, status: res.status });
+  }
+
+  if (res.status === 401 || res.status === 403) {
+    await signOutAdmin();
+    throw new Error("Admin session expired");
+  }
+
+  return res;
 }
 
 export async function signInWithPassword(email: string, password: string) {
   const res = await supabaseClient.auth.signInWithPassword({ email, password });
   setAdminAccessToken(res.data.session?.access_token ?? null);
   return res;
-}
-
-export async function signOutAdmin() {
-  setAdminAccessToken(null);
-  await supabaseClient.auth.signOut();
 }
 
 export async function fetchAdminMe() {

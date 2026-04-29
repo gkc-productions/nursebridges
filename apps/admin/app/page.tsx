@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { adminFetch, getAdminAccessToken } from "../lib/adminAuthClient";
+import { adminFetch } from "../lib/adminAuthClient";
 
 type Overview = {
   users: number;
@@ -18,12 +18,6 @@ export default function Dashboard() {
     const load = async () => {
       try {
         setError(null);
-
-        const token = getAdminAccessToken();
-        if (!token) {
-          setError("Admin access required. Go to login.");
-          return;
-        }
 
         const overviewRes = await adminFetch("/api/admin/jobs");
         if (!overviewRes.ok) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { adminFetch, getAdminAccessToken } from "../../lib/adminAuthClient";
+import { adminFetch } from "../../lib/adminAuthClient";
 
 type UserRow = {
   id: string;
@@ -17,21 +17,19 @@ export default function UsersPage() {
 
   useEffect(() => {
     const load = async () => {
-      const token = getAdminAccessToken();
-      if (!token) {
-        setError("Please sign in.");
-        return;
+      try {
+        const res = await adminFetch("/api/admin/users");
+
+        if (!res.ok) {
+          setError("Unable to load users.");
+          return;
+        }
+
+        const data = (await res.json()) as UserRow[];
+        setUsers(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unable to load users.");
       }
-
-      const res = await adminFetch("/api/admin/users");
-
-      if (!res.ok) {
-        setError("Unable to load users.");
-        return;
-      }
-
-      const data = (await res.json()) as UserRow[];
-      setUsers(data);
     };
 
     void load();
