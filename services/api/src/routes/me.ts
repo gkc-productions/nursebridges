@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { requireAuth } from "../auth";
+import { requireAuth } from "../auth.js";
 
 export async function meRoutes(app: FastifyInstance) {
   app.get("/me", async (req, reply) => {

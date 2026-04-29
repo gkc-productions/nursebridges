@@ -14,8 +14,19 @@ type NurseRow = {
   created_at: string;
 };
 
+type VerificationDocument = {
+  id: string;
+  storage_path: string;
+  document_type: string;
+  status: string;
+  reviewed_at: string | null;
+  rejection_reason: string | null;
+  created_at: string;
+};
+
 export default function NursesPage() {
   const [nurses, setNurses] = useState<NurseRow[]>([]);
+  const [documentsByNurse, setDocumentsByNurse] = useState<Record<string, VerificationDocument[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -30,6 +41,16 @@ export default function NursesPage() {
 
       const data = (await res.json()) as NurseRow[];
       setNurses(data);
+
+      const documentEntries = await Promise.all(
+        data.map(async (nurse) => {
+          const docsRes = await adminFetch(`/api/admin/nurses/${nurse.id}/verification-documents`);
+          if (!docsRes.ok) return [nurse.id, []] as const;
+          const docsData = (await docsRes.json()) as { documents?: VerificationDocument[] };
+          return [nurse.id, docsData.documents ?? []] as const;
+        })
+      );
+      setDocumentsByNurse(Object.fromEntries(documentEntries));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load nurses.");
     }
@@ -69,6 +90,7 @@ export default function NursesPage() {
           <tr>
             <th>Name</th>
             <th>License #</th>
+            <th>Documents</th>
             <th>Status</th>
             <th>Verified At</th>
             <th>Action</th>
@@ -79,6 +101,15 @@ export default function NursesPage() {
             <tr key={nurse.id}>
               <td>{nurse.profile_name ?? "-"}</td>
               <td>{nurse.license_number ?? "-"}</td>
+              <td>
+                {(documentsByNurse[nurse.id] ?? []).length === 0
+                  ? "-"
+                  : documentsByNurse[nurse.id].map((document) => (
+                      <div key={document.id}>
+                        {document.document_type}: {document.storage_path} ({document.status})
+                      </div>
+                    ))}
+              </td>
               <td>
                 <span className="badge">{nurse.verification_status}</span>
               </td>

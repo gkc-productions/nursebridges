@@ -7,7 +7,7 @@ export type Shift = {
   end_time: string;
 };
 
-export type JobStatus = "open" | "filled" | "closed";
+export type JobStatus = "open" | "assigned" | "completed" | "cancelled";
 
 export type Job = {
   id: string;

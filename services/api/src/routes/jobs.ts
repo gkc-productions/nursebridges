@@ -1,7 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import { requireAuth, requireRole } from "../auth";
-import { supabaseAdmin, supabaseForUser } from "../supabase";
-import { applyJobSchema, createJobSchema, updateJobSchema } from "../validators";
+import { writeAdminAuditLog } from "../audit.js";
+import { requireAuth, requireRole } from "../auth.js";
+import { createNotification, createNotifications } from "../notifications.js";
+import { supabaseAdmin, supabaseForUser } from "../supabase.js";
+import { applyJobSchema, createJobSchema, updateJobSchema } from "../validators.js";
 
 type JobRow = {
   id: string;
@@ -16,11 +18,37 @@ type JobRow = {
 };
 
 type ApplicationRow = {
+  id?: string;
   job_id: string;
   nurse_user_id: string;
   status: string;
   created_at: string;
 };
+
+function isTerminalJobStatus(status: string) {
+  return status === "cancelled" || status === "completed";
+}
+
+async function isVerifiedNurse(userId: string, jwt: string) {
+  const sb = supabaseForUser(jwt);
+  const { data, error } = await sb
+    .from("nurse_profiles")
+    .select("verification_status")
+    .eq("nurse_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw Object.assign(new Error("Unable to verify nurse status"), { statusCode: 500 });
+  }
+
+  return data?.verification_status === "approved";
+}
+
+async function requireVerifiedNurse(userId: string, jwt: string) {
+  if (!(await isVerifiedNurse(userId, jwt))) {
+    throw Object.assign(new Error("Nurse verification required"), { statusCode: 403 });
+  }
+}
 
 async function fetchAssignedNurseMap(jobIds: string[], jwt: string) {
   if (jobIds.length === 0) return { assigned: new Map<string, string>(), names: new Map<string, string>() };
@@ -55,6 +83,175 @@ async function fetchAssignedNurseMap(jobIds: string[], jwt: string) {
   return { assigned, names };
 }
 
+async function fetchAcceptedNurseId(jobId: string) {
+  if (!supabaseAdmin) return null;
+
+  const { data } = await supabaseAdmin
+    .from("applications")
+    .select("nurse_user_id")
+    .eq("job_id", jobId)
+    .eq("status", "accepted")
+    .maybeSingle();
+
+  return (data?.nurse_user_id as string | undefined) ?? null;
+}
+
+async function fetchJobApplications(jobId: string) {
+  if (!supabaseAdmin) return [];
+
+  const { data } = await supabaseAdmin
+    .from("applications")
+    .select("nurse_user_id,status")
+    .eq("job_id", jobId);
+
+  return (data ?? []) as Array<{ nurse_user_id: string; status: string }>;
+}
+
+async function notifyJobStatus(
+  job: { id: string; title?: string | null; patient_user_id?: string | null },
+  status: "cancelled" | "completed",
+  nurseIds: string[]
+) {
+  const title = job.title || "Job";
+  const notificationTitle = status === "cancelled" ? "Job cancelled" : "Job completed";
+  const body = `${title} is now ${status}.`;
+
+  await createNotifications([
+    {
+      userId: job.patient_user_id,
+      type: `job_${status}`,
+      title: notificationTitle,
+      body,
+      entityType: "job",
+      entityId: job.id
+    },
+    ...Array.from(new Set(nurseIds)).map((nurseId) => ({
+      userId: nurseId,
+      type: `assigned_job_${status}`,
+      title: notificationTitle,
+      body,
+      entityType: "job",
+      entityId: job.id
+    }))
+  ]);
+}
+
+async function cancelJob(jobId: string, actorId: string, actorRole: string) {
+  if (!supabaseAdmin) {
+    throw Object.assign(new Error("Admin client not configured"), { statusCode: 500 });
+  }
+
+  const { data: job, error: jobError } = await supabaseAdmin
+    .from("jobs")
+    .select("id,status,patient_user_id,title")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (jobError) throw Object.assign(new Error("Unable to update job"), { statusCode: 400 });
+  if (!job) throw Object.assign(new Error("Job not found"), { statusCode: 404 });
+  if (actorRole === "patient" && job.patient_user_id !== actorId) {
+    throw Object.assign(new Error("Forbidden"), { statusCode: 403 });
+  }
+  if (actorRole !== "patient" && actorRole !== "admin") {
+    throw Object.assign(new Error("Forbidden"), { statusCode: 403 });
+  }
+  if (job.status !== "open" && job.status !== "assigned") {
+    throw Object.assign(new Error("Invalid job transition"), { statusCode: 400 });
+  }
+
+  const applications = await fetchJobApplications(jobId);
+  const notifyNurseIds = applications
+    .filter((application) => application.status === "accepted" || application.status === "applied")
+    .map((application) => application.nurse_user_id);
+
+  const { error: rejectError } = await supabaseAdmin
+    .from("applications")
+    .update({ status: "rejected" })
+    .eq("job_id", jobId)
+    .eq("status", "applied");
+
+  if (rejectError) throw Object.assign(new Error("Unable to update job"), { statusCode: 400 });
+
+  const { data, error } = await supabaseAdmin
+    .from("jobs")
+    .update({ status: "cancelled" })
+    .eq("id", jobId)
+    .select("*")
+    .single();
+
+  if (error) throw Object.assign(new Error("Unable to update job"), { statusCode: 400 });
+
+  await notifyJobStatus(job, "cancelled", notifyNurseIds);
+
+  if (actorRole === "admin") {
+    await writeAdminAuditLog({
+      actor_id: actorId,
+      action: "job_cancelled",
+      entity_type: "job",
+      entity_id: jobId,
+      metadata: { previous_status: job.status }
+    });
+  }
+
+  return data;
+}
+
+async function completeJob(jobId: string, actorId: string, actorRole: string) {
+  if (!supabaseAdmin) {
+    throw Object.assign(new Error("Admin client not configured"), { statusCode: 500 });
+  }
+
+  const { data: job, error: jobError } = await supabaseAdmin
+    .from("jobs")
+    .select("id,status,patient_user_id,title")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (jobError) throw Object.assign(new Error("Unable to update job"), { statusCode: 400 });
+  if (!job) throw Object.assign(new Error("Job not found"), { statusCode: 404 });
+  if (job.status !== "assigned") {
+    throw Object.assign(new Error("Invalid job transition"), { statusCode: 400 });
+  }
+
+  const acceptedNurseId = await fetchAcceptedNurseId(jobId);
+  if (!acceptedNurseId) {
+    throw Object.assign(new Error("Invalid job transition"), { statusCode: 400 });
+  }
+
+  if (actorRole === "patient" && job.patient_user_id !== actorId) {
+    throw Object.assign(new Error("Forbidden"), { statusCode: 403 });
+  }
+  if (actorRole === "nurse" && acceptedNurseId !== actorId) {
+    throw Object.assign(new Error("Forbidden"), { statusCode: 403 });
+  }
+  if (actorRole !== "patient" && actorRole !== "nurse" && actorRole !== "admin") {
+    throw Object.assign(new Error("Forbidden"), { statusCode: 403 });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("jobs")
+    .update({ status: "completed" })
+    .eq("id", jobId)
+    .select("*")
+    .single();
+
+  if (error) throw Object.assign(new Error("Unable to update job"), { statusCode: 400 });
+
+  await notifyJobStatus(job, "completed", [acceptedNurseId]);
+
+  if (actorRole === "admin") {
+    await writeAdminAuditLog({
+      actor_id: actorId,
+      action: "job_completed",
+      entity_type: "job",
+      entity_id: jobId,
+      metadata: { previous_status: job.status, nurse_user_id: acceptedNurseId }
+    });
+  }
+
+  return data;
+}
+
 export async function jobRoutes(app: FastifyInstance) {
   // Create job (patient only)
   app.post("/jobs", async (req, reply) => {
@@ -76,23 +273,31 @@ export async function jobRoutes(app: FastifyInstance) {
     };
 
     const { data, error } = await sb.from("jobs").insert(payload).select("*").single();
-    if (error) return reply.code(400).send({ error: error.message });
+    if (error) return reply.code(400).send({ error: "Unable to create job" });
 
     return reply.send({ job: data });
   });
 
-  // List jobs (role-aware; relies on RLS)
+  // List jobs (role-aware)
   app.get("/jobs", async (req, reply) => {
     const authed = await requireAuth(req);
     const sb = supabaseForUser(authed.jwt);
 
-    const { data, error } = await sb
+    let query = sb
       .from("jobs")
-      .select("id,status,patient_user_id,title,description,address,start_time,hourly_rate,created_at")
-      .order("created_at", { ascending: false })
-      .limit(100);
+      .select("id,status,patient_user_id,title,description,address,start_time,hourly_rate,created_at");
 
-    if (error) return reply.code(400).send({ error: error.message });
+    if (authed.role === "patient") {
+      query = query.eq("patient_user_id", authed.userId);
+    } else if (authed.role === "nurse") {
+      await requireVerifiedNurse(authed.userId, authed.jwt);
+    } else if (authed.role !== "admin") {
+      return reply.code(403).send({ error: "Forbidden" });
+    }
+
+    const { data, error } = await query.order("created_at", { ascending: false }).limit(100);
+
+    if (error) return reply.code(400).send({ error: "Unable to load jobs" });
 
     const jobs = (data ?? []) as JobRow[];
     const jobIds = jobs.map((job) => job.id);
@@ -136,20 +341,68 @@ export async function jobRoutes(app: FastifyInstance) {
     });
   });
 
-  // Update job (patient can cancel; admin can update status)
+  app.patch("/jobs/:jobId/cancel", async (req, reply) => {
+    const authed = await requireAuth(req);
+    const { jobId } = req.params as any;
+    const job = await cancelJob(jobId, authed.userId, authed.role);
+    return reply.send({ job });
+  });
+
+  app.patch("/jobs/:jobId/complete", async (req, reply) => {
+    const authed = await requireAuth(req);
+    const { jobId } = req.params as any;
+    const job = await completeJob(jobId, authed.userId, authed.role);
+    return reply.send({ job });
+  });
+
+  // Update job (patient can cancel; admin can update fields or terminal status)
   app.patch("/jobs/:jobId", async (req, reply) => {
     const authed = await requireAuth(req);
     const { jobId } = req.params as any;
     const body = updateJobSchema.parse(req.body ?? {});
-    const sb = supabaseForUser(authed.jwt);
 
     let patch: Record<string, any> = {};
 
     if (authed.role === "patient") {
-      patch = { status: "closed" };
+      if (!supabaseAdmin) {
+        return reply.code(500).send({ error: "Admin client not configured" });
+      }
+
+      const { data: job, error: jobError } = await supabaseAdmin
+        .from("jobs")
+        .select("id,status,patient_user_id,title")
+        .eq("id", jobId)
+        .maybeSingle();
+
+      if (jobError) {
+        return reply.code(400).send({ error: "Unable to update job" });
+      }
+      if (!job) {
+        return reply.code(404).send({ error: "Job not found" });
+      }
+      if (job.patient_user_id !== authed.userId) {
+        return reply.code(403).send({ error: "Forbidden" });
+      }
+      if (body.status && body.status !== "cancelled") {
+        return reply.code(400).send({ error: "Invalid job transition" });
+      }
+      if (!body.status || job.status !== "open" && job.status !== "assigned") {
+        return reply.code(400).send({ error: "Invalid job transition" });
+      }
+
+      const data = await cancelJob(jobId, authed.userId, authed.role);
+      return reply.send({ job: data });
     } else if (authed.role === "admin") {
+      if (body.status === "cancelled") {
+        const data = await cancelJob(jobId, authed.userId, authed.role);
+        return reply.send({ job: data });
+      }
+      if (body.status === "completed") {
+        const data = await completeJob(jobId, authed.userId, authed.role);
+        return reply.send({ job: data });
+      }
+
       patch = {
-        ...(body.status ? { status: body.status } : {}),
         ...(body.description !== undefined ? { description: body.description } : {}),
         ...(body.address !== undefined ? { address: body.address } : {}),
         ...(body.start_time !== undefined ? { start_time: body.start_time } : {}),
@@ -159,11 +412,12 @@ export async function jobRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "Forbidden" });
     }
 
+    const sb = supabaseForUser(authed.jwt);
     const { data, error } = await sb.from("jobs").update(patch).eq("id", jobId).select("*").single();
-    if (error) return reply.code(400).send({ error: error.message });
+    if (error) return reply.code(400).send({ error: "Unable to update job" });
 
     if (authed.role === "admin" && supabaseAdmin) {
-      await supabaseAdmin.from("admin_audit_logs").insert({
+      await writeAdminAuditLog({
         actor_id: authed.userId,
         action: "job_status_update",
         entity_type: "job",
@@ -179,19 +433,37 @@ export async function jobRoutes(app: FastifyInstance) {
   app.post("/jobs/:jobId/apply", async (req, reply) => {
     const authed = await requireAuth(req);
     requireRole(authed, ["nurse"]);
+    await requireVerifiedNurse(authed.userId, authed.jwt);
 
     const { jobId } = req.params as any;
     const body = applyJobSchema.parse(req.body ?? {});
     const sb = supabaseForUser(authed.jwt);
 
-    const { data: job, error: jobErr } = await sb
+    const jobClient = supabaseAdmin ?? sb;
+    const { data: job, error: jobErr } = await jobClient
       .from("jobs")
       .select("id,status")
       .eq("id", jobId)
       .single();
 
     if (jobErr || !job) return reply.code(404).send({ error: "Job not found" });
-    if (job.status !== "open") return reply.code(400).send({ error: "Job is not open" });
+    if (job.status !== "open" || isTerminalJobStatus(job.status)) {
+      return reply.code(400).send({ error: "Invalid job transition" });
+    }
+
+    const { data: existingApplication, error: existingApplicationError } = await sb
+      .from("applications")
+      .select("id,status")
+      .eq("job_id", jobId)
+      .eq("nurse_user_id", authed.userId)
+      .maybeSingle();
+
+    if (existingApplicationError) {
+      return reply.code(400).send({ error: "Unable to apply to job" });
+    }
+    if (existingApplication) {
+      return reply.code(409).send({ error: "Application already exists" });
+    }
 
     const { data, error } = await sb
       .from("applications")
@@ -204,7 +476,30 @@ export async function jobRoutes(app: FastifyInstance) {
       .select("*")
       .single();
 
-    if (error) return reply.code(400).send({ error: error.message });
+    if (error) {
+      const code = (error as any).code;
+      return reply
+        .code(code === "23505" ? 409 : 400)
+        .send({ error: code === "23505" ? "Application already exists" : "Unable to apply to job" });
+    }
+
+    if (supabaseAdmin) {
+      const { data: jobForNotification } = await supabaseAdmin
+        .from("jobs")
+        .select("id,title,patient_user_id")
+        .eq("id", jobId)
+        .maybeSingle();
+
+      await createNotification({
+        userId: jobForNotification?.patient_user_id,
+        type: "nurse_applied",
+        title: "New nurse application",
+        body: `${authed.email ?? "A nurse"} applied to ${jobForNotification?.title ?? "your job"}.`,
+        entityType: "job",
+        entityId: jobId
+      });
+    }
+
     return reply.send({ application: data });
   });
 
@@ -224,7 +519,7 @@ export async function jobRoutes(app: FastifyInstance) {
       .select("*")
       .single();
 
-    if (error) return reply.code(400).send({ error: error.message });
+    if (error) return reply.code(400).send({ error: "Unable to withdraw application" });
     return reply.send({ application: data });
   });
 
@@ -244,7 +539,7 @@ export async function jobRoutes(app: FastifyInstance) {
       .eq("job_id", jobId)
       .order("created_at", { ascending: false });
 
-    if (error) return reply.code(400).send({ error: error.message });
+    if (error) return reply.code(400).send({ error: "Unable to load applications" });
 
     return reply.send({ applications: data ?? [] });
   });

@@ -1,13 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { adminJson } from "../../../../lib/requestId";
 import { requireAdmin } from "../../../../lib/adminAuth";
 
-export async function GET(req: NextRequest) {
-  const auth = await requireAdmin(req);
+export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request);
   if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+    return adminJson(request, { error: auth.error }, { status: auth.status });
   }
 
-  return NextResponse.json({
+  return adminJson(request, {
     id: auth.user.id,
     email: auth.user.email,
     role: auth.profile.role,

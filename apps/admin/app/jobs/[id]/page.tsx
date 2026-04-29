@@ -86,6 +86,26 @@ export default function JobDetailPage() {
     await load();
   };
 
+  const updateJobStatus = async (status: "cancelled" | "completed") => {
+    const token = getAdminAccessToken();
+    if (!token) {
+      setError("Please sign in.");
+      return;
+    }
+
+    const res = await adminFetch(`/api/admin/jobs/${jobId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status })
+    });
+
+    if (!res.ok) {
+      setError("Unable to update job.");
+      return;
+    }
+
+    await load();
+  };
+
   return (
     <section>
       <h2>Job Detail</h2>
@@ -99,6 +119,22 @@ export default function JobDetailPage() {
             <p>Nurse: {job.nurse_name ?? "Unassigned"}</p>
             <p>Created: {new Date(job.created_at).toLocaleString()}</p>
             <p>Description: {job.description ?? "-"}</p>
+            <div className="actions">
+              <button
+                className="button"
+                onClick={() => updateJobStatus("cancelled")}
+                disabled={job.status !== "open" && job.status !== "assigned"}
+              >
+                Cancel Job
+              </button>
+              <button
+                className="button"
+                onClick={() => updateJobStatus("completed")}
+                disabled={job.status !== "assigned"}
+              >
+                Complete Job
+              </button>
+            </div>
           </div>
           <div>
             <h3>Assign Nurse</h3>

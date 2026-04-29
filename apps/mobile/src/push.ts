@@ -1,12 +1,23 @@
 import * as Device from "expo-device";
+import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import type { Session } from "@supabase/supabase-js";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true
+  })
+});
 
 export async function registerForPushNotificationsAsync(
   session: Session | null,
   baseUrl: string
 ): Promise<void> {
-  if (!Device.isDevice) {
+  if (!session || !baseUrl || !Device.isDevice) {
     return;
   }
 
@@ -22,19 +33,42 @@ export async function registerForPushNotificationsAsync(
     return;
   }
 
-  const token = (await Notifications.getExpoPushTokenAsync()).data;
+  let token: string;
+  try {
+    token = (
+      await Notifications.getExpoPushTokenAsync(
+        Constants.easConfig?.projectId ? { projectId: Constants.easConfig.projectId } : undefined
+      )
+    ).data;
+  } catch {
+    return;
+  }
 
-  if (!session) return;
+  try {
+    await fetch(`${baseUrl}/push/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({
+        expo_push_token: token,
+        platform: Device.osName ?? "unknown",
+        device_name: Device.deviceName ?? undefined
+      })
+    });
+  } catch {
+    return;
+  }
+}
 
-  await fetch(`${baseUrl}/devices/register`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`
-    },
-    body: JSON.stringify({
-      expo_push_token: token,
-      platform: Device.osName ?? "unknown"
-    })
+export function addForegroundNotificationListener() {
+  return Notifications.addNotificationReceivedListener((notification) => {
+    const content = notification.request.content;
+    console.log("foreground notification received", {
+      title: content.title,
+      body: content.body,
+      data: content.data
+    });
   });
 }

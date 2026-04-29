@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { adminJson } from "../../../../lib/requestId";
 import { requireAdmin } from "../../../../lib/adminAuth";
 import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
 
@@ -13,7 +14,7 @@ type NurseRow = {
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin(request);
   if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+    return adminJson(request, { error: auth.error }, { status: auth.status });
   }
 
   const { data: nurseRows, error } = await supabaseAdmin
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return adminJson(request, { error: "Unable to load nurses" }, { status: 400 });
   }
 
   const nurseIds = (nurseRows ?? []).map((row) => row.nurse_id).filter(Boolean);
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     .in("id", nurseIds);
 
   if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 400 });
+    return adminJson(request, { error: "Unable to load nurses" }, { status: 400 });
   }
 
   const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
@@ -52,5 +53,5 @@ export async function GET(request: NextRequest) {
     };
   });
 
-  return NextResponse.json(merged);
+  return adminJson(request, merged);
 }

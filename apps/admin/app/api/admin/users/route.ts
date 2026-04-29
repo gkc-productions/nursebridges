@@ -1,11 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { adminJson } from "../../../../lib/requestId";
 import { requireAdmin } from "../../../../lib/adminAuth";
 import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
 
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin(request);
   if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+    return adminJson(request, { error: auth.error }, { status: auth.status });
   }
 
   const { data, error } = await supabaseAdmin
@@ -14,8 +15,8 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return adminJson(request, { error: "Unable to load users" }, { status: 400 });
   }
 
-  return NextResponse.json(data ?? []);
+  return adminJson(request, data ?? []);
 }

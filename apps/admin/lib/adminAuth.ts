@@ -13,15 +13,22 @@ export async function requireAdmin(req: NextRequest) {
     return { ok: false as const, status: 401, error: "Missing bearer token" };
   }
 
-  // ✅ Authoritative verification via Supabase Auth
-  const { data, error } = await supabaseAdmin.auth.getUser(token);
+  // Authoritative verification via Supabase Auth.
+  let authResult: Awaited<ReturnType<typeof supabaseAdmin.auth.getUser>>;
+  try {
+    authResult = await supabaseAdmin.auth.getUser(token);
+  } catch {
+    return { ok: false as const, status: 401, error: "Invalid token" };
+  }
+
+  const { data, error } = authResult;
   if (error || !data?.user) {
     return { ok: false as const, status: 401, error: "Invalid token" };
   }
 
   const userId = data.user.id;
 
-  // ✅ Enforce admin role from public.profiles
+  // Enforce admin role from public.profiles.
   const { data: profile, error: profErr } = await supabaseAdmin
     .from("profiles")
     .select("id, role, full_name")

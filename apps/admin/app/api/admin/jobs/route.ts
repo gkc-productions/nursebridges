@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { adminJson } from "../../../../lib/requestId";
 import { requireAdmin } from "../../../../lib/adminAuth";
 import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
 
@@ -13,7 +14,7 @@ type ApplicationRow = {
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin(request);
   if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+    return adminJson(request, { error: auth.error }, { status: auth.status });
   }
 
   const { data: jobs, error } = await supabaseAdmin
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return adminJson(request, { error: "Unable to load jobs" }, { status: 400 });
   }
 
   const jobIds = (jobs ?? []).map((job: JobRow) => job.id);
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
     .in("job_id", jobIds);
 
   if (applicationError) {
-    return NextResponse.json({ error: applicationError.message }, { status: 400 });
+    return adminJson(request, { error: "Unable to load jobs" }, { status: 400 });
   }
 
   const acceptedNurseByJob = new Map<string, string>();
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
     .in("id", allIds);
 
   if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 400 });
+    return adminJson(request, { error: "Unable to load jobs" }, { status: 400 });
   }
 
   const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
@@ -75,5 +76,5 @@ export async function GET(request: NextRequest) {
     };
   });
 
-  return NextResponse.json(merged);
+  return adminJson(request, merged);
 }

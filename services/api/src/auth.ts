@@ -1,6 +1,6 @@
 import type { FastifyRequest } from "fastify";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import { SUPABASE_URL, supabaseForUser } from "./supabase";
+import { SUPABASE_URL, supabaseForUser } from "./supabase.js";
 
 export type UserRole = "patient" | "nurse" | "admin";
 
@@ -14,6 +14,7 @@ export type Authed = {
 
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 const JWKS = createRemoteJWKSet(new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`));
+const USER_ROLES: UserRole[] = ["patient", "nurse", "admin"];
 
 export function getBearerToken(req: FastifyRequest): string | null {
   const h = req.headers.authorization;
@@ -60,17 +61,25 @@ export async function requireAuth(req: FastifyRequest): Promise<Authed> {
     .maybeSingle();
 
   if (profErr) {
-    throw Object.assign(new Error(`Failed to load profile: ${profErr.message}`), { statusCode: 500 });
+    throw Object.assign(new Error("Profile lookup failed"), { statusCode: 500 });
   }
 
-  const role = (profile?.role ?? "patient") as UserRole;
+  if (!profile) {
+    throw Object.assign(new Error("Profile row missing"), { statusCode: 403 });
+  }
 
-  return { jwt, userId, email, role, profile: profile ?? null };
+  if (!USER_ROLES.includes(profile.role as UserRole)) {
+    throw Object.assign(new Error("Invalid profile role"), { statusCode: 403 });
+  }
+
+  const role = profile.role as UserRole;
+
+  return { jwt, userId, email, role, profile };
 }
 
 export function requireRole(authed: Authed, roles: UserRole[]) {
   if (!roles.includes(authed.role)) {
-    throw Object.assign(new Error(`Forbidden (requires role: ${roles.join(", ")})`), { statusCode: 403 });
+    throw Object.assign(new Error("Forbidden"), { statusCode: 403 });
   }
 }
 
