@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as DocumentPicker from "expo-document-picker";
 import {
   ActivityIndicator,
@@ -13,7 +13,7 @@ import {
 import type { Session } from "@supabase/supabase-js";
 import { loadApiConfig } from "./src/env";
 import { addForegroundNotificationListener, registerForPushNotificationsAsync } from "./src/push";
-import { supabase } from "./src/supabase";
+import { getSupabaseClient } from "./src/supabase";
 
 type UserRole = "patient" | "nurse" | "admin";
 
@@ -87,6 +87,16 @@ type VerificationDocumentUploadUrlResponse = {
   token: string;
 };
 
+type ApiIssue = {
+  path?: string;
+  message: string;
+};
+
+type ApiErrorResponse = {
+  error?: string;
+  issues?: ApiIssue[];
+};
+
 const emptyJobForm = {
   title: "",
   description: "",
@@ -119,6 +129,39 @@ function buildVerificationStoragePath(userId: string, fileName: string) {
   return `${userId}/${Date.now()}-${safeFileName(fileName)}`;
 }
 
+function parseStartTimeInput(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return date.toISOString();
+}
+
+function parseHourlyRateInput(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+
+  const hourlyRate = Number(trimmed);
+  if (!Number.isFinite(hourlyRate) || hourlyRate < 0) return null;
+
+  return hourlyRate;
+}
+
+function formatApiErrorMessage(fallback: string, err: unknown) {
+  if (!(err instanceof ApiRequestError)) {
+    return fallback;
+  }
+
+  const issueMessages = err.issues.map((issue) => {
+    const path = issue.path?.trim();
+    return path ? `${path}: ${issue.message}` : issue.message;
+  });
+
+  return [err.message, ...issueMessages].filter(Boolean).join("\n") || fallback;
+}
+
 function getUploadErrorMessage(message: string | undefined) {
   const text = message ?? "";
   if (/permission|not authorized|row-level security|rls|403/i.test(text)) {
@@ -132,7 +175,20 @@ async function readJson<T>(res: Response): Promise<T> {
   return (text ? JSON.parse(text) : {}) as T;
 }
 
+class ApiRequestError extends Error {
+  status: number;
+  issues: ApiIssue[];
+
+  constructor(status: number, response: ApiErrorResponse) {
+    super(response.error || "Request failed.");
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.issues = response.issues ?? [];
+  }
+}
+
 export default function App() {
+  const supabase = useMemo(() => getSupabaseClient(), []);
   const [baseUrl, setBaseUrl] = useState("");
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
@@ -156,6 +212,7 @@ export default function App() {
 
   const [jobForm, setJobForm] = useState(emptyJobForm);
   const [verificationDocumentType, setVerificationDocumentType] = useState("license");
+  const lastAutoLoadKey = useRef<string | null>(null);
 
   const roleLabel = useMemo(() => role ?? "guest", [role]);
   const isApprovedNurse = nurseProfile?.verification_status === "approved";
@@ -165,6 +222,11 @@ export default function App() {
     let active = true;
 
     async function loadInitialState() {
+      if (!supabase) {
+        setBootLoading(false);
+        return;
+      }
+
       const [apiConfig, sessionResult] = await Promise.all([
         loadApiConfig(),
         supabase.auth.getSession()
@@ -178,6 +240,12 @@ export default function App() {
 
     void loadInitialState();
 
+    if (!supabase) {
+      return () => {
+        active = false;
+      };
+    }
+
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
     });
@@ -186,7 +254,7 @@ export default function App() {
       active = false;
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     async function loadProfile() {
@@ -200,12 +268,21 @@ export default function App() {
       setVerificationDocuments([]);
 
       if (!session) {
+        lastAutoLoadKey.current = null;
         setRole(null);
         setNurseProfile(null);
         return;
       }
 
       setScreenLoading(true);
+
+      if (!supabase) {
+        setError("Mobile app is missing Supabase configuration.");
+        setRole(null);
+        setNurseProfile(null);
+        setScreenLoading(false);
+        return;
+      }
 
       const { data, error: profileError } = await supabase
         .from("profiles")
@@ -248,10 +325,14 @@ export default function App() {
     }
 
     void loadProfile();
-  }, [session]);
+  }, [session, supabase]);
 
   useEffect(() => {
     if (!session || !role || !baseUrl || screenLoading) return;
+
+    const loadKey = `${session.user.id}:${role}:${baseUrl}:${nurseProfile?.verification_status ?? "none"}`;
+    if (lastAutoLoadKey.current === loadKey) return;
+    lastAutoLoadKey.current = loadKey;
 
     if (role === "patient") {
       void loadPatientJobs();
@@ -286,10 +367,20 @@ export default function App() {
     }
 
     const res = await fetch(`${baseUrl}${path}`, { ...init, headers });
-    const data = await readJson<T & { error?: string }>(res);
+    const data = await readJson<T & ApiErrorResponse>(res);
 
     if (!res.ok) {
-      throw new Error(data.error || "Request failed.");
+      const error = new ApiRequestError(res.status, data);
+      console.warn("API request failed", {
+        path,
+        status: error.status,
+        error: error.message,
+        issues: error.issues.map((issue) => ({
+          path: issue.path,
+          message: issue.message
+        }))
+      });
+      throw error;
     }
 
     return data as T;
@@ -368,6 +459,10 @@ export default function App() {
 
   async function uploadVerificationDocument() {
     if (!session || role !== "nurse") return;
+    if (!supabase) {
+      setError("Mobile app is missing Supabase configuration.");
+      return;
+    }
 
     const documentType = verificationDocumentType.trim();
     if (!documentType) {
@@ -474,6 +569,11 @@ export default function App() {
   }
 
   async function handleSignIn() {
+    if (!supabase) {
+      setError("Mobile app is missing Supabase configuration.");
+      return;
+    }
+
     setActionLoading(true);
     setError(null);
     setNotice(null);
@@ -487,6 +587,11 @@ export default function App() {
   }
 
   async function handleSignOut() {
+    if (!supabase) {
+      setError("Mobile app is missing Supabase configuration.");
+      return;
+    }
+
     setActionLoading(true);
     await supabase.auth.signOut();
     setActionLoading(false);
@@ -501,6 +606,18 @@ export default function App() {
       return;
     }
 
+    const startTime = parseStartTimeInput(jobForm.start_time);
+    if (startTime === null) {
+      setError("Enter a valid start time, for example 2026-05-01T14:00:00Z.");
+      return;
+    }
+
+    const hourlyRate = parseHourlyRateInput(jobForm.hourly_rate);
+    if (hourlyRate === null) {
+      setError("Enter a valid hourly rate of 0 or more.");
+      return;
+    }
+
     setActionLoading(true);
     setError(null);
     setNotice(null);
@@ -512,16 +629,16 @@ export default function App() {
           title,
           description: jobForm.description.trim(),
           address: jobForm.address.trim(),
-          start_time: jobForm.start_time.trim() || undefined,
-          hourly_rate: jobForm.hourly_rate.trim() ? Number(jobForm.hourly_rate) : undefined
+          start_time: startTime,
+          hourly_rate: hourlyRate
         })
       });
 
       setJobForm(emptyJobForm);
       setNotice("Job created.");
       await loadPatientJobs();
-    } catch {
-      setError("Unable to create job.");
+    } catch (err) {
+      setError(formatApiErrorMessage("Unable to create job.", err));
     } finally {
       setActionLoading(false);
     }
@@ -581,6 +698,14 @@ export default function App() {
       <SafeAreaView style={styles.centered}>
         <ActivityIndicator size="large" color="#1E6A5A" />
         <Text style={styles.meta}>Loading NurseBridge...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!supabase) {
+    return (
+      <SafeAreaView style={styles.centered}>
+        <Text style={styles.error}>Mobile app is missing Supabase configuration.</Text>
       </SafeAreaView>
     );
   }

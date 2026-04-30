@@ -17,6 +17,9 @@ pip install -r requirements.txt
 - `OPENAI_MODEL`: optional. Defaults to `gpt-4o-mini`.
 - `CODEX_CMD`: optional. Defaults to `codex exec --skip-git-repo-check`.
 - `CODEX_TIMEOUT_SECONDS`: optional. Defaults to `1800`.
+- `OPENAI_TIMEOUT_SEC`: optional. Defaults to `60`.
+- `MAX_TURNS`: optional. Defaults to `3`.
+- `MANUAL_MODE`: optional. Set `MANUAL_MODE=1` to skip OpenAI and run `prompts/current.md` once.
 
 Secrets are never printed by the orchestrator.
 
@@ -35,13 +38,7 @@ Defaults:
 - Max turns: `3`
 - Seed task: Android app startup crash diagnosis, read-only investigation
 
-Before the first autonomous turn, the orchestrator records a git checkpoint:
-
-```bash
-git status --short
-git add .
-git commit -m "checkpoint before autonomous orchestrator session" || true
-```
+Before the first autonomous turn, the orchestrator records a non-mutating git checkpoint in `checkpoint.json`.
 
 ## Logs
 
@@ -51,7 +48,16 @@ Each run writes logs under:
 tools/twin-orchestrator/logs/YYYYMMDD-HHMMSS/
 ```
 
-Per-turn logs include the strategist JSON, the exact Codex prompt, Codex stdout/stderr, return code, and state history.
+Each run writes `session.json` and `checkpoint.json`.
+
+Per-turn logs include:
+
+- `turn-XX/strategist_raw.txt`
+- `turn-XX/strategist_decision.json` or `turn-XX/strategist-error.json`
+- `turn-XX/codex_prompt.txt`
+- `turn-XX/codex_stdout.txt`
+- `turn-XX/codex_stderr.txt`
+- `turn-XX/codex_result.json`
 
 ## Guardrails
 
@@ -79,5 +85,21 @@ Stop conditions:
 Run this from the repo root:
 
 ```bash
-echo "list the files in this repo" | codex exec --skip-git-repo-check
+echo "Inspect repo and report package scripts. Do not change files." | codex exec --skip-git-repo-check --sandbox danger-full-access
+```
+
+## Manual Mode Test
+
+Run this from the repo root:
+
+```bash
+MANUAL_MODE=1 CODEX_CMD='codex exec --skip-git-repo-check --sandbox danger-full-access' tools/twin-orchestrator/.venv/bin/python tools/twin-orchestrator/orchestrator.py
+```
+
+## One-Turn Strategist Test
+
+Run this from the repo root:
+
+```bash
+OPENAI_MODEL="gpt-4o-mini" MAX_TURNS=1 CODEX_CMD='codex exec --skip-git-repo-check --sandbox danger-full-access' tools/twin-orchestrator/.venv/bin/python tools/twin-orchestrator/orchestrator.py
 ```

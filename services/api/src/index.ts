@@ -2,6 +2,7 @@ import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { randomUUID } from "node:crypto";
+import { ZodError } from "zod";
 import { jobRoutes } from "./routes/jobs.js";
 import { applicationRoutes } from "./routes/applications.js";
 import { meRoutes } from "./routes/me.js";
@@ -70,7 +71,12 @@ async function main() {
 
   // Error handler (consistent responses)
   app.setErrorHandler((err: any, req, reply) => {
-    const statusCode = err?.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
+    const isValidationError = err instanceof ZodError;
+    const statusCode = isValidationError
+      ? 400
+      : err?.statusCode && Number.isInteger(err.statusCode)
+        ? err.statusCode
+        : 500;
     if (statusCode >= 500) {
       req.log.error({
         event: "request_error",
@@ -88,7 +94,14 @@ async function main() {
         : statusCode === 400
           ? "Invalid request"
           : "Internal server error";
-    reply.code(statusCode).send({ error: msg, requestId: req.id });
+    const issues = isValidationError
+      ? err.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message
+        }))
+      : undefined;
+
+    reply.code(statusCode).send({ error: msg, issues, requestId: req.id });
   });
 
   await app.listen({ port: PORT, host: "0.0.0.0" });

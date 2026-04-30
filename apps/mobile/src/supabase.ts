@@ -10,6 +10,8 @@ type SecureStorage = {
 
 const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl as string | undefined;
 const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey as string | undefined;
+const hasSupabaseConfig = Boolean(supabaseUrl?.trim() && supabaseAnonKey?.trim());
+let supabaseClient: SupabaseClient | null = null;
 
 const secureStorage: SecureStorage = {
   getItem: (key) => SecureStore.getItemAsync(key),
@@ -17,15 +19,21 @@ const secureStorage: SecureStorage = {
   removeItem: (key) => SecureStore.deleteItemAsync(key)
 };
 
-export const supabase: SupabaseClient = createClient(supabaseUrl ?? "", supabaseAnonKey ?? "", {
-  auth: {
-    storage: secureStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false
-  }
-});
+export function getSupabaseClient(): SupabaseClient | null {
+  if (!hasSupabaseConfig) return null;
+
+  supabaseClient ??= createClient(supabaseUrl as string, supabaseAnonKey as string, {
+    auth: {
+      storage: secureStorage,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false
+    }
+  });
+
+  return supabaseClient;
+}
 
 export function getSupabaseConfig() {
-  return { supabaseUrl, supabaseAnonKey };
+  return { supabaseUrl, supabaseAnonKey, hasSupabaseConfig };
 }

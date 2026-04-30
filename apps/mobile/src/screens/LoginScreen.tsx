@@ -1,18 +1,24 @@
 import React, { useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { supabase } from "../supabase";
+import { getSupabaseClient } from "../supabase";
 
 type Props = {
   onSignedIn: () => void;
 };
 
 export default function LoginScreen({ onSignedIn }: Props) {
+  const supabase = getSupabaseClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSignIn = async () => {
+    if (!supabase) {
+      setError("Mobile app is missing Supabase configuration.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 

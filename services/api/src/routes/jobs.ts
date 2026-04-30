@@ -262,7 +262,6 @@ export async function jobRoutes(app: FastifyInstance) {
     const sb = supabaseForUser(authed.jwt);
 
     const payload = {
-      created_by: authed.userId,
       patient_user_id: authed.userId,
       title: body.title,
       description: body.description ?? null,

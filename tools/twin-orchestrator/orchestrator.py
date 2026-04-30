@@ -12,14 +12,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from openai import OpenAI
-
-
 DEFAULT_REPO_ROOT = Path("/home/nurseapp/nursebridge")
 DEFAULT_TOOL_DIR = Path("tools/twin-orchestrator")
-DEFAULT_MAX_TURNS = 3
+DEFAULT_MAX_TURNS = int(os.environ.get("MAX_TURNS", "3"))
 DEFAULT_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 DEFAULT_CODEX_CMD = "codex exec --skip-git-repo-check"
+DEFAULT_OPENAI_TIMEOUT_SEC = int(os.environ.get("OPENAI_TIMEOUT_SEC", "60"))
+MANUAL_PROMPT = Path("prompts/current.md")
 
 SEED_TASK = (
     "Diagnose why the NurseBridge Android app installs successfully but does not "
@@ -131,26 +130,69 @@ def write_json(path: Path, data: Any) -> None:
     path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def append_text(path: Path, text: str) -> None:
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(text)
-        if not text.endswith("\n"):
-            handle.write("\n")
+def write_text(path: Path, text: str) -> None:
+    path.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8")
 
 
-def create_checkpoint(repo_root: Path, logs_dir: Path) -> None:
+def create_checkpoint(repo_root: Path, logs_dir: Path) -> dict[str, Any]:
+    head = git_head(repo_root)
     status = run_cmd(["git", "status", "--short"], repo_root, timeout=60)
-    write_json(logs_dir / "checkpoint-status.json", asdict(status))
+    diff_stat = run_cmd(["git", "diff", "--stat"], repo_root, timeout=60)
+    checkpoint = {
+        "git_head": head,
+        "git_status_short": status.stdout,
+        "git_diff_stat": diff_stat.stdout,
+        "status_command": asdict(status),
+        "diff_stat_command": asdict(diff_stat),
+        "mutates_git": False,
+    }
+    write_json(logs_dir / "checkpoint.json", checkpoint)
+    return checkpoint
 
-    add_result = run_cmd(["git", "add", "."], repo_root, timeout=300)
-    write_json(logs_dir / "checkpoint-add.json", asdict(add_result))
 
-    commit_result = run_cmd(
-        ["git", "commit", "-m", "checkpoint before autonomous orchestrator session"],
-        repo_root,
-        timeout=300,
-    )
-    write_json(logs_dir / "checkpoint-commit.json", asdict(commit_result))
+def new_session(
+    *,
+    repo_root: Path,
+    tool_dir: Path,
+    logs_dir: Path,
+    args: argparse.Namespace,
+    manual_mode: bool,
+) -> dict[str, Any]:
+    return {
+        "run_id": logs_dir.name,
+        "repo_root": str(repo_root),
+        "tool_dir": str(tool_dir),
+        "logs_dir": str(logs_dir),
+        "started_at": datetime.now(UTC).isoformat(),
+        "finished_at": None,
+        "status": "RUNNING",
+        "stop_reason": None,
+        "exit_code": None,
+        "manual_mode": manual_mode,
+        "model": None if manual_mode else args.model,
+        "max_turns": args.max_turns,
+        "codex_cmd": codex_command_from_env(),
+        "openai_timeout_sec": DEFAULT_OPENAI_TIMEOUT_SEC,
+        "task": args.task,
+        "checkpoint": None,
+        "turns": [],
+    }
+
+
+def finalize_session(
+    session: dict[str, Any],
+    logs_dir: Path,
+    *,
+    status: str,
+    stop_reason: str,
+    exit_code: int,
+) -> int:
+    session["finished_at"] = datetime.now(UTC).isoformat()
+    session["status"] = status
+    session["stop_reason"] = stop_reason
+    session["exit_code"] = exit_code
+    write_json(logs_dir / "session.json", session)
+    return exit_code
 
 
 def matching_guardrails(task: str) -> list[str]:
@@ -270,7 +312,7 @@ def parse_strategy(raw: str, raw_path: Path | None = None) -> dict[str, Any]:
 
 
 def call_strategist(
-    client: OpenAI,
+    client: Any,
     model: str,
     task: str,
     history: list[dict[str, Any]],
@@ -305,6 +347,53 @@ def run_codex(repo_root: Path, prompt: str) -> CommandResult:
     return run_cmd(cmd, repo_root, stdin=prompt, timeout=int(os.environ.get("CODEX_TIMEOUT_SECONDS", "1800")))
 
 
+def run_codex_turn(repo_root: Path, turn_dir: Path, prompt: str) -> CommandResult:
+    write_text(turn_dir / "codex_prompt.txt", prompt)
+    codex_result = run_codex(repo_root, prompt)
+    write_text(turn_dir / "codex_stdout.txt", codex_result.stdout)
+    write_text(turn_dir / "codex_stderr.txt", codex_result.stderr)
+    write_json(turn_dir / "codex_result.json", asdict(codex_result))
+    return codex_result
+
+
+def run_manual_mode(repo_root: Path, tool_dir: Path, logs_dir: Path, session: dict[str, Any]) -> int:
+    turn_dir = logs_dir / "turn-01"
+    turn_dir.mkdir(parents=True, exist_ok=True)
+    prompt_path = tool_dir / MANUAL_PROMPT
+
+    write_text(turn_dir / "strategist_raw.txt", f"MANUAL_MODE=1 prompt_path={prompt_path}")
+    if not prompt_path.exists():
+        error = f"manual prompt file not found: {prompt_path}"
+        write_json(turn_dir / "strategist-error.json", {"error": error, "prompt_path": str(prompt_path)})
+        print(error, file=sys.stderr)
+        session["turns"].append({"turn": 1, "mode": "manual", "status": "ERROR", "error": error})
+        return finalize_session(session, logs_dir, status="ERROR", stop_reason="manual prompt missing", exit_code=8)
+
+    prompt = prompt_path.read_text(encoding="utf-8")
+    decision = {
+        "status": "CONTINUE",
+        "codex_prompt": prompt,
+        "rationale": "MANUAL_MODE=1 skips OpenAI and runs the current prompt once.",
+        "test_failed": False,
+    }
+    write_json(turn_dir / "strategist_decision.json", decision)
+
+    codex_result = run_codex_turn(repo_root, turn_dir, prompt)
+    turn_record = {
+        "turn": 1,
+        "mode": "manual",
+        "status": "DONE" if codex_result.returncode == 0 else "BLOCKED",
+        "codex_returncode": codex_result.returncode,
+        "turn_dir": str(turn_dir),
+    }
+    session["turns"].append(turn_record)
+
+    if codex_result.returncode != 0:
+        return finalize_session(session, logs_dir, status="BLOCKED", stop_reason="codex failed", exit_code=8)
+    print("DONE")
+    return finalize_session(session, logs_dir, status="DONE", stop_reason="manual mode completed", exit_code=0)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Local NurseBridge Twin Orchestrator")
     parser.add_argument("--repo-root", default=str(DEFAULT_REPO_ROOT))
@@ -327,15 +416,18 @@ def main() -> int:
     if not tool_dir.is_absolute():
         tool_dir = repo_root / tool_dir
 
+    manual_mode = os.environ.get("MANUAL_MODE") == "1"
     logs_root = tool_dir / "logs"
     logs_root.mkdir(parents=True, exist_ok=True)
     run_id = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     logs_dir = logs_root / run_id
     logs_dir.mkdir(parents=True, exist_ok=True)
+    session = new_session(repo_root=repo_root, tool_dir=tool_dir, logs_dir=logs_dir, args=args, manual_mode=manual_mode)
+    session["checkpoint"] = create_checkpoint(repo_root, logs_dir)
 
-    if not os.environ.get("OPENAI_API_KEY"):
+    if not manual_mode and not os.environ.get("OPENAI_API_KEY"):
         print("OPENAI_API_KEY is not set; refusing to start orchestrator.", file=sys.stderr)
-        return 2
+        return finalize_session(session, logs_dir, status="ERROR", stop_reason="OPENAI_API_KEY missing", exit_code=2)
 
     blocked_terms = require_guardrail_approval(args.task, args.approve_guardrails)
     if blocked_terms:
@@ -345,11 +437,16 @@ def main() -> int:
             + ", ".join(blocked_terms),
             file=sys.stderr,
         )
-        return 3
+        session["guardrail_matches"] = blocked_terms
+        return finalize_session(session, logs_dir, status="BLOCKED", stop_reason="forbidden task not approved", exit_code=3)
 
-    create_checkpoint(repo_root, logs_dir)
     base_head = git_head(repo_root)
-    client = OpenAI()
+    if manual_mode:
+        return run_manual_mode(repo_root, tool_dir, logs_dir, session)
+
+    from openai import APITimeoutError, OpenAI
+
+    client = OpenAI(timeout=DEFAULT_OPENAI_TIMEOUT_SEC)
     history: list[dict[str, Any]] = []
     consecutive_test_failures = 0
 
@@ -360,47 +457,59 @@ def main() -> int:
 
         try:
             strategy = call_strategist(client, args.model, args.task, history, strategist_raw_path)
+        except APITimeoutError as exc:
+            error = f"strategist timed out after {DEFAULT_OPENAI_TIMEOUT_SEC} seconds"
+            write_json(
+                turn_dir / "strategist-error.json",
+                {"error": error, "detail": str(exc), "raw_response_path": str(strategist_raw_path)},
+            )
+            print(f"Strategist error: {error}", file=sys.stderr)
+            session["turns"].append({"turn": turn, "status": "ERROR", "error": error, "turn_dir": str(turn_dir)})
+            return finalize_session(session, logs_dir, status="ERROR", stop_reason="strategist timeout", exit_code=4)
         except Exception as exc:
             write_json(
                 turn_dir / "strategist-error.json",
                 {"error": str(exc), "raw_response_path": str(strategist_raw_path)},
             )
             print(f"Strategist error: {exc}", file=sys.stderr)
-            return 4
+            session["turns"].append({"turn": turn, "status": "ERROR", "error": str(exc), "turn_dir": str(turn_dir)})
+            return finalize_session(session, logs_dir, status="ERROR", stop_reason="strategist error", exit_code=4)
 
-        write_json(turn_dir / "strategy.json", strategy)
-        append_text(turn_dir / "codex-prompt.txt", strategy["codex_prompt"])
+        write_json(turn_dir / "strategist_decision.json", strategy)
 
         if strategy["status"] == "DONE":
             print("DONE")
-            return 0
+            session["turns"].append({"turn": turn, "status": "DONE", "turn_dir": str(turn_dir)})
+            return finalize_session(session, logs_dir, status="DONE", stop_reason="strategist returned DONE", exit_code=0)
         if strategy["status"] == "BLOCKED":
             print("BLOCKED")
-            return 5
+            session["turns"].append({"turn": turn, "status": "BLOCKED", "turn_dir": str(turn_dir)})
+            return finalize_session(session, logs_dir, status="BLOCKED", stop_reason="strategist returned BLOCKED", exit_code=5)
 
-        codex_result = run_codex(repo_root, strategy["codex_prompt"])
-        write_json(turn_dir / "codex-result.json", asdict(codex_result))
+        codex_result = run_codex_turn(repo_root, turn_dir, strategy["codex_prompt"])
 
         test_failed = bool(strategy["test_failed"]) or codex_result.returncode != 0
         consecutive_test_failures = consecutive_test_failures + 1 if test_failed else 0
-        history.append(
-            {
-                "turn": turn,
-                "strategy": strategy,
-                "codex_returncode": codex_result.returncode,
-                "codex_stdout_tail": codex_result.stdout[-4000:],
-                "codex_stderr_tail": codex_result.stderr[-4000:],
-                "git_diff_stat": git_diff_since(repo_root, base_head),
-            }
-        )
+        turn_record = {
+            "turn": turn,
+            "strategy": strategy,
+            "codex_returncode": codex_result.returncode,
+            "codex_stdout_tail": codex_result.stdout[-4000:],
+            "codex_stderr_tail": codex_result.stderr[-4000:],
+            "git_diff_stat": git_diff_since(repo_root, base_head),
+            "turn_dir": str(turn_dir),
+        }
+        history.append(turn_record)
+        session["turns"].append(turn_record)
         write_json(logs_dir / "state.json", {"history": history})
+        write_json(logs_dir / "session.json", session)
 
         if consecutive_test_failures >= 2:
             print("Stopping after two consecutive test failures.", file=sys.stderr)
-            return 6
+            return finalize_session(session, logs_dir, status="BLOCKED", stop_reason="two consecutive test failures", exit_code=6)
 
     print("Max turns reached.", file=sys.stderr)
-    return 7
+    return finalize_session(session, logs_dir, status="MAX_TURNS", stop_reason="max turns reached", exit_code=7)
 
 
 if __name__ == "__main__":
