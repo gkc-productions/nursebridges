@@ -191,17 +191,77 @@ Respect this constraint: if the task says read-only, the codex_prompt must expli
 """.strip()
 
 
-def parse_strategy(raw: str) -> dict[str, Any]:
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"strategist returned invalid JSON: {exc}") from exc
+def strip_markdown_fences(raw: str) -> str:
+    stripped = raw.strip()
+    if not stripped.startswith("```"):
+        return stripped
 
+    lines = stripped.splitlines()
+    if lines and lines[0].lstrip().startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
+
+
+def extract_first_json_object(raw: str) -> str | None:
+    in_string = False
+    escaped = False
+    depth = 0
+    start: int | None = None
+
+    for index, char in enumerate(raw):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and in_string:
+            escaped = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if char == "{":
+            if depth == 0:
+                start = index
+            depth += 1
+            continue
+        if char == "}" and depth:
+            depth -= 1
+            if depth == 0 and start is not None:
+                return raw[start : index + 1]
+    return None
+
+
+def parse_strategy(raw: str, raw_path: Path | None = None) -> dict[str, Any]:
+    candidates = [raw, strip_markdown_fences(raw)]
+    extracted = extract_first_json_object(candidates[-1])
+    if extracted:
+        candidates.append(extracted)
+
+    last_error: json.JSONDecodeError | None = None
+    data: Any = None
+    for candidate in candidates:
+        try:
+            data = json.loads(candidate)
+            break
+        except json.JSONDecodeError as exc:
+            last_error = exc
+    else:
+        raw_hint = f"; raw response logged at {raw_path}" if raw_path else ""
+        raise ValueError(f"strategist returned invalid JSON: {last_error}{raw_hint}") from last_error
+
+    if not isinstance(data, dict):
+        raw_hint = f"; raw response logged at {raw_path}" if raw_path else ""
+        raise ValueError(f"strategist JSON must be an object{raw_hint}")
+
+    raw_hint = f"; raw response logged at {raw_path}" if raw_path else ""
     status = data.get("status")
     if status not in {"CONTINUE", "DONE", "BLOCKED"}:
-        raise ValueError("strategist status must be CONTINUE, DONE, or BLOCKED")
+        raise ValueError(f"strategist status must be CONTINUE, DONE, or BLOCKED{raw_hint}")
     if not isinstance(data.get("codex_prompt"), str):
-        raise ValueError("strategist codex_prompt must be a string")
+        raise ValueError(f"strategist codex_prompt must be a string{raw_hint}")
     if not isinstance(data.get("rationale"), str):
         data["rationale"] = ""
     if not isinstance(data.get("test_failed"), bool):
@@ -209,20 +269,35 @@ def parse_strategy(raw: str) -> dict[str, Any]:
     return data
 
 
-def call_strategist(client: OpenAI, model: str, task: str, history: list[dict[str, Any]]) -> dict[str, Any]:
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
+def call_strategist(
+    client: OpenAI,
+    model: str,
+    task: str,
+    history: list[dict[str, Any]],
+    raw_path: Path,
+) -> dict[str, Any]:
+    request = {
+        "model": model,
+        "messages": [
             {
                 "role": "system",
                 "content": "You plan safe local Codex CLI turns and respond with JSON only.",
             },
             {"role": "user", "content": build_strategy_prompt(task, history)},
         ],
-        temperature=0.2,
-    )
+        "temperature": 0.2,
+        "response_format": {"type": "json_object"},
+    }
+    try:
+        response = client.chat.completions.create(**request)
+    except Exception as exc:
+        if "response_format" not in str(exc):
+            raise
+        request.pop("response_format")
+        response = client.chat.completions.create(**request)
     content = response.choices[0].message.content or ""
-    return parse_strategy(content)
+    raw_path.write_text(content, encoding="utf-8")
+    return parse_strategy(content, raw_path)
 
 
 def run_codex(repo_root: Path, prompt: str) -> CommandResult:
@@ -281,11 +356,15 @@ def main() -> int:
     for turn in range(1, args.max_turns + 1):
         turn_dir = logs_dir / f"turn-{turn:02d}"
         turn_dir.mkdir(parents=True, exist_ok=True)
+        strategist_raw_path = turn_dir / "strategist_raw.txt"
 
         try:
-            strategy = call_strategist(client, args.model, args.task, history)
+            strategy = call_strategist(client, args.model, args.task, history, strategist_raw_path)
         except Exception as exc:
-            write_json(turn_dir / "strategist-error.json", {"error": str(exc)})
+            write_json(
+                turn_dir / "strategist-error.json",
+                {"error": str(exc), "raw_response_path": str(strategist_raw_path)},
+            )
             print(f"Strategist error: {exc}", file=sys.stderr)
             return 4
 
