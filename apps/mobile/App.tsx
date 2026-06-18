@@ -600,7 +600,7 @@ export default function App() {
   async function handleCreateJob() {
     if (!session) return;
 
-    const title = jobForm.title.trim();
+    const title = jobForm.title.trim().slice(0, 120);
     if (title.length < 3) {
       setError("Enter a job title with at least 3 characters.");
       return;
@@ -627,8 +627,8 @@ export default function App() {
         method: "POST",
         body: JSON.stringify({
           title,
-          description: jobForm.description.trim(),
-          address: jobForm.address.trim(),
+          description: jobForm.description.trim().slice(0, 4000),
+          address: jobForm.address.trim().slice(0, 255),
           start_time: startTime,
           hourly_rate: hourlyRate
         })
