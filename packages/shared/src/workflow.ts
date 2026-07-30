@@ -155,14 +155,12 @@ export function buildAssignmentNotifications(input: {
   selectedNurseUserId: string;
   rejectedNurseIds: string[];
 }): AssignmentNotification[] {
-  const jobTitle = input.jobTitle || "Job";
-
   return [
     {
       userId: input.selectedNurseUserId,
       type: "job_assigned",
-      title: "Job assigned",
-      body: `${jobTitle} has been assigned to you.`,
+      title: "Care request assigned",
+      body: "A care request has been assigned to you.",
       entityType: "job",
       entityId: input.jobId
     },
@@ -170,7 +168,7 @@ export function buildAssignmentNotifications(input: {
       userId: nurseUserId,
       type: "application_rejected" as const,
       title: "Application not selected",
-      body: `${jobTitle} was assigned to another nurse.`,
+      body: "A care request was assigned to another nurse or caregiver.",
       entityType: "job" as const,
       entityId: input.jobId
     }))
@@ -314,9 +312,8 @@ export function buildTerminalJobNotifications(input: {
   status: TerminalJobStatus;
   nurseUserIds: string[];
 }): TerminalJobNotification[] {
-  const jobTitle = input.jobTitle || "Job";
-  const notificationTitle = input.status === "cancelled" ? "Job cancelled" : "Job completed";
-  const body = `${jobTitle} is now ${input.status}.`;
+  const notificationTitle = input.status === "cancelled" ? "Care request cancelled" : "Care request completed";
+  const body = `A care request is now ${input.status}.`;
   const nurseUserIds = Array.from(new Set(input.nurseUserIds.filter(Boolean)));
 
   return [

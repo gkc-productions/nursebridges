@@ -313,8 +313,8 @@ describe("shared workflow rules", () => {
     assert.deepEqual(
       notifications.map((notification) => [notification.userId, notification.type, notification.body]),
       [
-        ["nurse-1", "job_assigned", "Morning care has been assigned to you."],
-        ["nurse-2", "application_rejected", "Morning care was assigned to another nurse."]
+        ["nurse-1", "job_assigned", "A care request has been assigned to you."],
+        ["nurse-2", "application_rejected", "A care request was assigned to another nurse or caregiver."]
       ]
     );
   });
@@ -331,8 +331,8 @@ describe("shared workflow rules", () => {
     assert.deepEqual(
       notifications.map((notification) => [notification.userId, notification.type, notification.body]),
       [
-        ["patient-1", "job_cancelled", "Morning care is now cancelled."],
-        ["nurse-1", "assigned_job_cancelled", "Morning care is now cancelled."]
+        ["patient-1", "job_cancelled", "A care request is now cancelled."],
+        ["nurse-1", "assigned_job_cancelled", "A care request is now cancelled."]
       ]
     );
   });
