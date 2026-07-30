@@ -119,6 +119,5 @@ If a deployed RPC path fails:
 
 ## Open Decisions
 
-- Confirm whether notification text should continue using "Job" internally or be migrated in the database function to public "care request" language.
 - Decide whether admin audit metadata should also include accepted nurse ID for completion.
 - Decide whether a dedicated non-exposed server DB role should replace direct `service_role` RPC execution later.

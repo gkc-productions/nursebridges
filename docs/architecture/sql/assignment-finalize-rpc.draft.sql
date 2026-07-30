@@ -125,8 +125,8 @@ begin
   values (
     p_selected_nurse_user_id,
     'job_assigned',
-    'Job assigned',
-    coalesce(v_job.title, 'Job') || ' has been assigned to you.',
+    'Care request assigned',
+    'A care request has been assigned to you.',
     'job',
     p_job_id
   );
@@ -143,7 +143,7 @@ begin
     rejected_nurse_user_id,
     'application_rejected',
     'Application not selected',
-    coalesce(v_job.title, 'Job') || ' was assigned to another nurse.',
+    'A care request was assigned to another nurse or caregiver.',
     'job',
     p_job_id
   from unnest(v_rejected_nurse_user_ids) as rejected_nurse_user_id;

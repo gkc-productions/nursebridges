@@ -4,6 +4,8 @@ This checklist summarizes current beta readiness for NurseBridge. It is not a pr
 
 Record verification evidence in `docs/release/beta-evidence-log.md` before marking incomplete or blocked items complete.
 Use `docs/release/beta-verification-matrix.md` to confirm what evidence is required for each beta gate.
+Use `docs/release/beta-evidence-templates.md` to keep evidence entries consistent.
+Use `docs/release/closed-beta-go-no-go.md` for the owner/operator decision page before inviting outside testers.
 Use `docs/ops/mobile-beta-build-readiness.md` before requesting or running any Expo/EAS beta build.
 
 Current overall status:
@@ -101,6 +103,7 @@ Status legend:
 - [x] Mobile code does not reference service role keys or database passwords.
 - [x] Private storage bucket remains private.
 - [x] API logging redacts authorization/cookie/token-like fields.
+- [ ] VM API logger redaction should be reverified on `/home/nurseapp/nursebridge` before inviting outside testers.
 - [ ] Final beta security review should be performed before inviting external users.
 
 ## Secrets/Env
@@ -130,6 +133,20 @@ Status legend:
 - [x] Observability runbook exists.
 - [x] Closed-beta operations playbook exists.
 - [ ] Define who monitors logs during beta and expected response times.
+
+## Workflow Atomicity
+
+- [x] Review-only assignment RPC design exists.
+- [x] Review-only terminal job RPC design exists.
+- [x] Read-only RPC prerequisite checks exist for assignment and terminal actions.
+- [x] Production canonical assignment field is documented as `jobs.assigned_nurse_user_id`.
+- [ ] Reverify live Supabase exposes `jobs.assigned_nurse_user_id` before RPC apply.
+- [ ] Apply and expose `finalize_applied_assignment_rpc` after explicit owner approval.
+- [ ] Wire API/admin assignment to the RPC-backed finalizer by default.
+- [ ] Apply and expose `finalize_terminal_job_rpc` after explicit owner approval.
+- [ ] Wire API/admin cancel/complete to the RPC-backed finalizer by default.
+- [ ] Keep admin verification admin-server-only, but keep assignment/cancel/complete on the same API/admin finalizer contracts.
+- [ ] Treat guarded multi-write workflow as internal engineering proof only unless the owner signs a written outside-tester exception.
 
 ## Cloudflare Routes
 

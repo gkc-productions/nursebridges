@@ -175,6 +175,7 @@ Nurse verification upload language should make clear:
 - Upload is for beta review.
 - Approval is not automatic.
 - Unsupported verification claims are not being made.
+- Do not expose private storage paths.
 
 ## Evidence Required Before Marking Complete
 

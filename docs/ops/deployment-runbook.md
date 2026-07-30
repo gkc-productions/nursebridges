@@ -28,7 +28,7 @@ Those require separate scoped approval.
 
 ## Deployment Rules
 
-- Do not deploy broad changes while Android create-job remains unverified unless the change directly supports the create-job fix or staged docs sync.
+- Do not deploy broad changes while installed-device create-request proof remains missing unless the change directly supports the create-request proof path, workflow safety, or staged docs sync.
 - Run focused tests for touched packages.
 - Run full `pnpm verify` before production-track deploys.
 - Restart only services affected by code changes.

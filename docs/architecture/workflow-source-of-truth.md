@@ -18,7 +18,8 @@ Known facts:
 - Admin assignment is guarded, but not yet database-transactional.
 - Production schema may contain historical compatibility columns.
 - `patient_user_id` is the current canonical patient ownership field.
-- Assignment is represented by an accepted application and may also involve an assignment column such as `assigned_nurse_user_id`.
+- `jobs.assigned_nurse_user_id` is the intended canonical assignment field for production writes.
+- Exactly one accepted application for the assigned nurse/caregiver is supporting evidence and compatibility state, not the production source of truth.
 
 Current risk:
 
@@ -76,8 +77,8 @@ services/api
         calls workflow package
 
 apps/admin
-        calls canonical API endpoints where practical
-        or calls workflow package server-side only while preserving the same contract
+        uses the same RPC-backed assignment and terminal finalizer contracts as API
+        keeps admin-only verification server-side with matching audit/notification rules
 
 apps/mobile
         calls API only
@@ -95,7 +96,7 @@ Current implementation note:
 - A review-only assignment RPC draft now lives at `docs/architecture/sql/assignment-finalize-rpc.draft.sql`, with the approval and verification path in `docs/ops/assignment-rpc-rollout-plan.md`. It is not applied to Supabase.
 - A review-only terminal job RPC draft now lives at `docs/architecture/sql/terminal-job-finalize-rpc.draft.sql`, with the approval and verification path in `docs/ops/terminal-job-rpc-rollout-plan.md`. It is not applied to Supabase.
 - Do not broaden API edits from the partial local API snapshot. Future API command-boundary work must still reconcile from the VM's full API source.
-- The next consolidation slice should move admin mutations behind canonical API endpoints or extract command orchestration into one workflow boundary.
+- The next consolidation slice should move admin assignment/cancel/complete behind the same RPC-backed finalizer contract used by API routes. Admin verification can remain admin-server-only because it is not a patient/nurse lifecycle transition.
 
 ## Why Not Database RPC First
 
@@ -127,7 +128,7 @@ Target behavior:
    - write admin audit row if actor is admin.
 6. Return a typed result that both admin and API routes can render consistently.
 
-If Supabase schema supports a single canonical assignment column, choose it explicitly and make any other representation derived or compatibility-only.
+The production canonical assignment column is `jobs.assigned_nurse_user_id`. Accepted application state should remain supporting evidence and compatibility state, and any read path that derives assignment only from accepted applications should be treated as temporary until the RPC-backed API/admin rollout is complete.
 
 ## Error Contract
 
@@ -146,17 +147,17 @@ User-facing clients should receive calm copy and a request reference. Logs shoul
 
 ## Migration Sequence
 
-Do not begin broad consolidation while Android create-job is still broken.
+Do not begin broad consolidation while installed-device create-request proof is still missing.
 
 After create-job is fixed:
 
 1. Verify production data contract using `docs/ops/supabase-data-contract-verification.md`.
-2. Confirm canonical assignment representation.
+2. Reverify that live Supabase exposes `jobs.assigned_nurse_user_id` and that RPC-backed assignment writes it as the canonical field.
 3. Inventory all state-changing workflow code in Fastify API and Next.js admin routes.
 4. Extract pure lifecycle rule helpers into a shared workflow package if they are not already shared.
-5. Move duplicated admin assignment checks to the canonical package or canonical API endpoint.
-6. Make assignment transactional or wrap it in a database RPC with typed API handling.
-7. Move cancel/complete helpers to the same canonical path.
+5. Move admin assignment to the same RPC-backed finalizer contract as API assignment.
+6. Make assignment transactional through the approved database RPC with typed API/admin handling.
+7. Move admin cancel/complete to the same RPC-backed terminal finalizer contract as API terminal actions.
 8. Ensure notification and audit side effects are part of the canonical command result.
 9. Add contract tests that exercise the same rules through API and admin paths.
 10. Re-run full workflow smoke after explicit approval if production.

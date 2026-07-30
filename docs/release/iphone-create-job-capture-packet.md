@@ -84,12 +84,13 @@ Use a patient beta account.
 1. Open the installed NurseBridge build.
 2. Sign in as the patient tester.
 3. Confirm the app reaches the patient area.
-4. Start one care support request.
-5. Fill the required fields with non-sensitive test data.
-6. Submit once.
-7. If it succeeds, confirm the new request appears in the patient request list with `open` status.
-8. If it fails, tap `Copy issue details`.
-9. Paste the result into the engineering thread.
+4. Tap `Copy` in the `Support snapshot` panel and keep the copied text for evidence.
+5. Start one care support request.
+6. Fill the required fields with non-sensitive test data.
+7. Submit once.
+8. If it succeeds, confirm the new request appears in the patient request list with `open` status, then tap `Copy` in the `Support snapshot` panel again.
+9. If it fails, tap `Copy issue details`.
+10. Paste the support snapshot and any copied issue details into the engineering thread.
 
 Do not retry repeatedly unless engineering asks.
 
@@ -119,6 +120,7 @@ Do not enter:
 Send:
 
 - Whether submit succeeded or failed.
+- Copied `Support snapshot` text from the app.
 - Copied issue details from the app, if it failed.
 - Tester role: patient.
 - Device model if known.
@@ -188,6 +190,7 @@ App/build: internal iOS/TestFlight build
 Environment: https://api.nursebridges.com
 Workflow: patient create care request
 Copied issue reference:
+Support snapshot:
 Watcher command:
 Log event:
 Request ID:

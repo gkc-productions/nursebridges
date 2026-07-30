@@ -35,7 +35,9 @@ Before VM access was blocked, the following was verified on the VM:
 - Public API `/health` returned OK.
 - Public admin route returned the expected Cloudflare Access redirect.
 
-After the guarded VM sync on 2026-07-29, VM API typecheck, API build, 62 API tests, the read-only live create-job schema contract check, shared package typecheck/build, 13 shared package tests against compiled `dist/workflow.js`, mobile typecheck, 23 mobile tests, admin typecheck, 16 admin tests, scripts/ops tests 5/5, 79-file staged-package guard, root `pnpm verify`, and root `pnpm run build` passed after the lead-engineering blueprint and mobile role-specific workflow slices were added.
+After the guarded VM sync on 2026-07-29, VM API typecheck, API build, 59 API tests, the read-only live create-job schema contract check, shared package typecheck/build, 13 shared package tests against compiled `dist/workflow.js`, mobile typecheck, 23 mobile tests, admin typecheck, 16 admin tests, scripts/ops tests 5/5, 77-file staged-package guard, root `pnpm verify`, and root `pnpm run build` passed after the lead-engineering blueprint, mobile role-specific workflow slices, and terminal job RPC approval package were added.
+
+The newer API terminal RPC finalizer adapter, go/no-go packet, evidence-template, access and secrets readiness guard, admin/API boundary readiness guard, API log hygiene guard, beta gate guard, beta operations readiness guard, canonical assignment readiness guard, in-app consent readiness guard, legal and consent readiness guard, production sequence readiness guard, release-doc guard, mobile secret hygiene guard, mobile support snapshot guard, NurseBridge isolation guard, notification and audit privacy guard, private document path hygiene guard, real-device proof readiness guard, restore drill readiness guard, RPC SQL safety guard, Android install preflight guard, build status command and regression test, workflow atomicity readiness guard, workflow smoke readiness guard, and trust-language guard slice has focused VM proof only so far: API typecheck passed, focused terminal adapter tests passed 3/3, and the full API suite passed 62/62. The 131-file staged package passed locally, but VM identity guard, VM staged-package guard, root `pnpm verify`, and root `pnpm run build` are pending because SSH escalation was blocked by account usage limits.
 
 ## Current Blocker
 
@@ -94,11 +96,55 @@ These files were prepared locally under `vm-stage`, synced to `/home/nurseapp/nu
 
 - `scripts/ops/verify-nursebridges-identity.mjs`
 - `scripts/ops/verify-vm-stage-package.mjs`
+- `scripts/ops/show-build-status.mjs`
+- `scripts/ops/check-admin-api-boundary-readiness.mjs`
+- `scripts/ops/check-api-log-hygiene.mjs`
 - `scripts/ops/check-assignment-rpc-contract.mjs`
+- `scripts/ops/check-canonical-assignment-readiness.mjs`
 - `scripts/ops/check-terminal-job-rpc-contract.mjs`
+- `scripts/ops/check-access-and-secrets-readiness.mjs`
+- `scripts/ops/check-beta-gates.mjs`
+- `scripts/ops/check-beta-ops-readiness.mjs`
+- `scripts/ops/check-in-app-consent-readiness.mjs`
+- `scripts/ops/check-release-doc-links.mjs`
+- `scripts/ops/check-legal-consent-readiness.mjs`
+- `scripts/ops/check-mobile-secret-hygiene.mjs`
+- `scripts/ops/check-mobile-support-snapshot.mjs`
+- `scripts/ops/check-nursebridge-isolation.mjs`
+- `scripts/ops/check-notification-audit-privacy.mjs`
+- `scripts/ops/check-private-document-path-hygiene.mjs`
+- `scripts/ops/check-production-sequence-readiness.mjs`
+- `scripts/ops/check-real-device-proof-readiness.mjs`
+- `scripts/ops/check-restore-drill-readiness.mjs`
+- `scripts/ops/check-rpc-sql-safety.mjs`
+- `scripts/ops/check-trust-language.mjs`
+- `scripts/ops/check-workflow-atomicity-readiness.mjs`
+- `scripts/ops/check-workflow-smoke-readiness.mjs`
 - `scripts/ops/smoke-beta-workflow.sh`
+- `scripts/ops/test/check-admin-api-boundary-readiness.test.mjs`
+- `scripts/ops/test/check-api-log-hygiene.test.mjs`
 - `scripts/ops/test/check-assignment-rpc-contract.test.mjs`
+- `scripts/ops/test/check-canonical-assignment-readiness.test.mjs`
 - `scripts/ops/test/check-terminal-job-rpc-contract.test.mjs`
+- `scripts/ops/test/check-access-and-secrets-readiness.test.mjs`
+- `scripts/ops/test/check-beta-gates.test.mjs`
+- `scripts/ops/test/check-beta-ops-readiness.test.mjs`
+- `scripts/ops/test/check-in-app-consent-readiness.test.mjs`
+- `scripts/ops/test/check-release-doc-links.test.mjs`
+- `scripts/ops/test/check-legal-consent-readiness.test.mjs`
+- `scripts/ops/test/check-mobile-secret-hygiene.test.mjs`
+- `scripts/ops/test/check-mobile-support-snapshot.test.mjs`
+- `scripts/ops/test/check-nursebridge-isolation.test.mjs`
+- `scripts/ops/test/check-notification-audit-privacy.test.mjs`
+- `scripts/ops/test/check-private-document-path-hygiene.test.mjs`
+- `scripts/ops/test/check-production-sequence-readiness.test.mjs`
+- `scripts/ops/test/check-real-device-proof-readiness.test.mjs`
+- `scripts/ops/test/check-restore-drill-readiness.test.mjs`
+- `scripts/ops/test/check-rpc-sql-safety.test.mjs`
+- `scripts/ops/test/check-trust-language.test.mjs`
+- `scripts/ops/test/check-workflow-atomicity-readiness.test.mjs`
+- `scripts/ops/test/check-workflow-smoke-readiness.test.mjs`
+- `scripts/ops/test/show-build-status.test.mjs`
 - `scripts/ops/test/smoke-beta-workflow.test.mjs`
 - `packages/shared/package.json`
 - `packages/shared/tsconfig.json`
@@ -129,7 +175,11 @@ These files were prepared locally under `vm-stage`, synced to `/home/nurseapp/nu
 - `apps/mobile/assets/splash.png`
 - `apps/mobile/scripts/verify-ios-release-readiness.mjs`
 - `apps/mobile/scripts/verify-ios-install-preflight.mjs`
+- `apps/mobile/scripts/verify-android-install-preflight.mjs`
 - `apps/mobile/src/theme.ts`
+- `apps/mobile/src/types.ts`
+- `apps/mobile/src/screens/ApiTestScreen.tsx`
+- `apps/mobile/src/screens/TokenScreen.tsx`
 - `apps/mobile/src/workflow.ts`
 - `apps/mobile/test/workflow.test.ts`
 - `apps/admin/package.json`
@@ -148,6 +198,7 @@ These files were prepared locally under `vm-stage`, synced to `/home/nurseapp/nu
 - `docs/legal/beta-legal-consent-checklist.md`
 - `docs/ops/closed-beta-ops-playbook.md`
 - `docs/ops/deployment-runbook.md`
+- `docs/ops/observability.md`
 - `docs/ops/supabase-data-contract-verification.md`
 - `docs/ops/assignment-rpc-rollout-plan.md`
 - `docs/ops/terminal-job-rpc-rollout-plan.md`
@@ -161,11 +212,14 @@ These files were prepared locally under `vm-stage`, synced to `/home/nurseapp/nu
 - `docs/release/current-build-status.md`
 - `docs/release/beta-readiness.md`
 - `docs/release/beta-verification-matrix.md`
+- `docs/release/beta-evidence-templates.md`
+- `docs/release/closed-beta-go-no-go.md`
 - `docs/release/beta-evidence-log.md`
 - `docs/release/closed-beta-operator-runbook.md`
 - `docs/release/mobile-build.md`
 - `docs/release/vm-sync-handoff.md`
 - `docs/release/engineering-state-snapshot.md`
+- `docs/release/pending-vm-verification.md`
 - `docs/release/production-build-plan.md`
 - `docs/release/implementation-backlog.md`
 
@@ -195,6 +249,7 @@ ssh nursebridge-vm 'mkdir -p /home/nurseapp/nursebridge/scripts/ops/test'
 ssh nursebridge-vm 'mkdir -p /home/nurseapp/nursebridge/packages/shared/src /home/nurseapp/nursebridge/packages/shared/test'
 scp 'vm-stage/scripts/ops/verify-nursebridges-identity.mjs' nursebridge-vm:/home/nurseapp/nursebridge/scripts/ops/verify-nursebridges-identity.mjs
 scp 'vm-stage/scripts/ops/verify-vm-stage-package.mjs' nursebridge-vm:/home/nurseapp/nursebridge/scripts/ops/verify-vm-stage-package.mjs
+scp 'vm-stage/scripts/ops/show-build-status.mjs' nursebridge-vm:/home/nurseapp/nursebridge/scripts/ops/show-build-status.mjs
 scp 'vm-stage/scripts/ops/smoke-beta-workflow.sh' nursebridge-vm:/home/nurseapp/nursebridge/scripts/ops/smoke-beta-workflow.sh
 scp 'vm-stage/scripts/ops/test/smoke-beta-workflow.test.mjs' nursebridge-vm:/home/nurseapp/nursebridge/scripts/ops/test/smoke-beta-workflow.test.mjs
 scp 'vm-stage/packages/shared/package.json' nursebridge-vm:/home/nurseapp/nursebridge/packages/shared/package.json
@@ -209,6 +264,8 @@ scp 'vm-stage/apps/mobile/assets/icon.png' nursebridge-vm:/home/nurseapp/nursebr
 scp 'vm-stage/apps/mobile/assets/splash.png' nursebridge-vm:/home/nurseapp/nursebridge/apps/mobile/assets/splash.png
 scp 'vm-stage/apps/mobile/scripts/verify-ios-release-readiness.mjs' nursebridge-vm:/home/nurseapp/nursebridge/apps/mobile/scripts/verify-ios-release-readiness.mjs
 scp 'vm-stage/apps/mobile/scripts/verify-ios-install-preflight.mjs' nursebridge-vm:/home/nurseapp/nursebridge/apps/mobile/scripts/verify-ios-install-preflight.mjs
+scp 'vm-stage/apps/mobile/scripts/verify-android-install-preflight.mjs' nursebridge-vm:/home/nurseapp/nursebridge/apps/mobile/scripts/verify-android-install-preflight.mjs
+scp 'vm-stage/apps/mobile/src/types.ts' nursebridge-vm:/home/nurseapp/nursebridge/apps/mobile/src/types.ts
 scp 'vm-stage/apps/mobile/src/workflow.ts' nursebridge-vm:/home/nurseapp/nursebridge/apps/mobile/src/workflow.ts
 scp 'vm-stage/apps/mobile/test/workflow.test.ts' nursebridge-vm:/home/nurseapp/nursebridge/apps/mobile/test/workflow.test.ts
 scp 'vm-stage/apps/admin/package.json' nursebridge-vm:/home/nurseapp/nursebridge/apps/admin/package.json

@@ -174,7 +174,7 @@ Current risk:
 Decision:
 
 - For closed beta, keep the duplication only where it has matching guardrails and verification.
-- Before broader beta, consolidate shared lifecycle/dispatcher rules or make admin call canonical API endpoints for lifecycle transitions.
+- Before outside-tester beta, assignment and terminal lifecycle transitions should converge on the same RPC-backed finalizer contracts used by the API. Admin-only verification may remain in the protected admin server path with audit and notification coverage.
 
 ### Database/Auth/Storage
 

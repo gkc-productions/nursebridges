@@ -33,6 +33,20 @@ Do not change:
 - Verify against production only during an approved monitoring window.
 - If a query reveals private data, stop and adjust the query to return metadata only.
 
+## Backup And Restore Drill
+
+Closed beta is not recovery-ready until a restore drill has been completed and recorded.
+
+Restore drill rules:
+
+- Use a non-production Supabase project as the restore target.
+- Use non-sensitive seed data only.
+- Do not restore production private user data into an unmanaged project.
+- Verify schema restore, expected beta tables, and at least one safe count/query result.
+- Clean up or roll back the target project after the drill if it is not retained.
+- Record the result with `## Restore Drill Evidence` in `docs/release/beta-evidence-log.md`.
+- If `pg_dump` is unavailable, keep the restore drill blocked instead of claiming recovery readiness.
+
 ## Preferred Access
 
 Use whichever approved access method is available on the VM:
@@ -186,17 +200,17 @@ where table_schema = 'public'
 order by column_name;
 ```
 
-Confirm whether assignment is represented by:
+Confirm that production assignment can be represented by:
 
-- accepted application only
-- `jobs.assigned_nurse_user_id`
-- another assigned caregiver field
-- compatibility combination
+- canonical field: `jobs.assigned_nurse_user_id`
+- supporting evidence: exactly one accepted application for the assigned nurse/caregiver
+- compatibility-only reads that may still derive assignment from accepted applications until RPC-backed API/admin rollout is complete
 
 Before broader beta:
 
-- Choose one canonical assignment representation.
-- Treat others as derived/compatibility-only.
+- Reverify `jobs.assigned_nurse_user_id` exists in live Supabase.
+- Treat accepted application state as supporting evidence, not a second production source of truth.
+- Treat any accepted-application-only read path as compatibility-only until it is reconciled.
 - Update `docs/architecture/data-contract.md`.
 
 ## RLS Enablement

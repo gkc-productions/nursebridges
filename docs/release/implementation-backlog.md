@@ -3,7 +3,8 @@
 This backlog converts the production architecture, build plan, and experience spec into ordered engineering work packages. It should be updated as real evidence lands.
 
 Use `docs/release/beta-verification-matrix.md` to map each work package to the evidence needed before closing the related beta gate.
-Use `docs/product/ui-implementation-brief.md` to scope UI implementation work after real-device create-job is proven.
+Use `docs/release/closed-beta-go-no-go.md` before recommending any outside-tester beta launch.
+Use `docs/product/ui-implementation-brief.md` to scope UI implementation work after real-device create-request is proven.
 Use `docs/ops/mobile-beta-build-readiness.md` before any Expo/EAS beta build is requested or run.
 Use `docs/architecture/workflow-source-of-truth.md` for NB-08 workflow consolidation.
 
@@ -52,7 +53,7 @@ Evidence:
 
 - Terminal output or note in `docs/release/beta-evidence-log.md`.
 
-## Package NB-01: Prove Real-Device Create-Job
+## Package NB-01: Prove Real-Device Create-Request
 
 Goal:
 
@@ -72,7 +73,7 @@ Work:
   - Apple Developer/App Store Connect must have or select the matching app identifier.
   - Xcode must be able to create/download a development provisioning profile for the connected iPhone.
 - Use `docs/release/android-create-job-capture-packet.md` if Android access is recovered.
-- Trigger one fresh patient create-job attempt from an installed iOS/internal build or Android app.
+- Trigger one fresh patient create-request attempt from an installed iOS/internal build or Android app.
 - Copy the app error reference.
 - Inspect request-specific API logs.
 - Patch only the exact root cause:
@@ -279,7 +280,7 @@ Evidence:
 
 Goal:
 
-- Reduce drift between Fastify API and Next.js admin route behavior before broader beta.
+- Make assignment and terminal lifecycle transitions safe enough for outside-tester beta by converging API/admin command boundaries on RPC-backed finalizer contracts.
 
 Current status:
 
@@ -295,20 +296,27 @@ Current status:
 - Shared assignment-planning slice completed on 2026-07-18: `@nursebridge/shared/workflow` now owns pure assignment application selection, rejection-recipient planning, and assignment notification payload construction. API admin assignment and admin web assignment consume the shared plan, and API patient application acceptance consumes the shared notification builder.
 - Patient-decision audit slice completed on 2026-07-18: API patient application accept/reject decisions now write a structured `application_decision` audit row only after the guarded decision succeeds, and stale accept failures still avoid application mutations, notifications, and audit rows.
 - API assignment-command slice completed on 2026-07-18: API admin assignment and patient application acceptance now share `services/api/src/jobAssignmentCommand.ts` for the final read-recipients, claim-job, accept-selected, reject-competing, and notify sequence.
-- This does not complete NB-08 because full transaction/RPC-backed assignment atomicity and the API/admin command boundary still need consolidation before broader beta.
+- This does not complete NB-08 because full transaction/RPC-backed assignment and terminal finalization plus API/admin command-boundary convergence still need to be wired before outside-tester beta, unless the owner signs a written exception.
 
 Work:
 
 - Use `docs/architecture/workflow-source-of-truth.md` as the consolidation plan.
-- Decide whether admin should keep server-side workflow helpers or call canonical API endpoints for assignment/cancel/complete.
-- Make assignment transactional or otherwise atomic enough for broader beta.
+- Reconcile from the VM's full API source before touching runtime route behavior.
+- Verify live Supabase schema and RPC exposure prerequisites using the read-only contract checks.
+- Apply and wire `finalize_applied_assignment_rpc` after explicit owner approval.
+- Move API/admin assignment to the same RPC-backed finalizer contract.
+- Apply and wire `finalize_terminal_job_rpc` after explicit owner approval.
+- Move API/admin cancel/complete to the same RPC-backed terminal finalizer contract.
+- Keep admin-only verification in the protected admin server path with audit and notification coverage.
 - Verify `docs/architecture/data-contract.md` against production using `docs/ops/supabase-data-contract-verification.md`.
 - Add database contract checks for canonical job/application fields.
 
 Acceptance:
 
-- One canonical lifecycle implementation or a clearly enforced canonical boundary.
 - Assignment cannot partially accept/reject in inconsistent ways.
+- Terminal cancel/complete cannot leave applications, notifications, audit, and job state out of sync.
+- API and admin assignment/cancel/complete use the same RPC-backed finalizer contracts by default.
+- Guarded multi-write workflow is internal engineering proof only unless the owner signs a written outside-tester exception.
 - Tests cover patient, nurse, admin, stale write, wrong role, and terminal states.
 - Data contract is updated if production schema differs.
 
@@ -415,12 +423,13 @@ The current execution sequence is:
 ```text
 NB-00 keep guarded docs/package synced
         -> resolve iOS signing for com.nursebridges.mobile or recover Android access
-        -> NB-01 prove real-device create-job via installed build
+        -> NB-01 prove real-device create-request via installed build
         -> NB-02 prove closed-beta workflow
-        -> NB-03/NB-04/NB-05 product hardening
+        -> NB-08 wire RPC-backed assignment/terminal finalizers and admin/API command boundary
+        -> NB-03/NB-04/NB-05 focused product hardening on proven paths
         -> NB-07 notifications
         -> NB-09/NB-10 beta readiness
         -> NB-11 controlled beta
 ```
 
-NB-08 backend consolidation should begin before broader beta, but it should not distract from NB-01 while real-device create-request remains unproven. iOS can prove the first installed-device workflow; Android must be rechecked before wider beta unless the owner explicitly accepts an iPhone-first beta limitation.
+NB-08 should not distract from NB-01 while real-device create-request remains unproven, but it is the default engineering gate before outside-tester beta once the workflow proof path is available. iOS can prove the first installed-device workflow; Android must be rechecked before wider beta unless the owner explicitly accepts an iPhone-first beta limitation.

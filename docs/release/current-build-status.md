@@ -31,7 +31,11 @@ The attempted iPhone Expo Go/LAN path was abandoned because it was not reliable 
 
 The mobile app now has a generated native iOS project at `apps/mobile/ios`. Local Xcode Debug and Release compiles for `NurseBridge.xcworkspace` succeed for iPhone OS with signing disabled. The Release build includes production-style JS bundling. The app has internal-beta icon and splash assets, physical iOS internal and TestFlight EAS profiles, and an idempotent `pnpm run ios:repair` script for native prebuild repairs. The Apple/app-store identity has been aligned to the owner-provided plural identifier: `nursebridges`, bundle id `com.nursebridges.mobile`. A signed physical-device build is currently blocked by Apple account/provisioning, not by app compilation: Xcode reports no authenticated account for team `R2N3CHKSBB` and no development provisioning profile for `com.nursebridges.mobile`.
 
-The local read-only installed-build preflight command is `cd apps/mobile && pnpm run ios:install-preflight`. Current preflight result: source identity and Xcode project identity pass for `nursebridges` / `com.nursebridges.mobile`, but no physical iPhone/iPad is visible to Xcode, no valid code-signing identity is installed, and no provisioning profile references `com.nursebridges.mobile`.
+The local read-only iOS installed-build preflight command is `cd apps/mobile && pnpm run ios:install-preflight`. Current preflight result on 2026-07-30: source identity, Xcode project identity, team `R2N3CHKSBB`, physical iPhone visibility, and at least one valid code-signing identity pass. The remaining iOS blocker is no provisioning profile on this Mac referencing `com.nursebridges.mobile`.
+
+The local read-only Android installed-build preflight command is `cd apps/mobile && pnpm run android:install-preflight`. Current preflight result on 2026-07-30: source identity and Android platform-tools pass, but `adb devices -l` lists no connected/authorized Android device yet. The likely next phone-side step is enabling Developer Options/USB debugging, accepting the USB debugging prompt, using a data-capable cable, or changing the USB connection mode.
+
+Current phone-proof unblocker: use either path, not both. For Android, make the phone appear in `adb devices -l` as an authorized `device`, then run `cd apps/mobile && pnpm run android:install-preflight` before any install/build approval. For iPhone, install or download a provisioning profile for `com.nursebridges.mobile`, then rerun `cd apps/mobile && pnpm run ios:install-preflight`. When either preflight passes, the next engineering step is an approval-gated installed app run and one patient create-request proof against `https://api.nursebridges.com`.
 
 The mobile API environment fallback now protects physical iPhone and Android devices from using a stored `localhost` API base URL. Physical devices fall back to the approved tunnel/API base instead, which reduces false create-job failures during real-device testing.
 
@@ -75,9 +79,59 @@ Terminal cancel/complete now has its own review-only database-atomicity package:
 
 `scripts/ops/check-terminal-job-rpc-contract.mjs` now provides a read-only Supabase metadata check for the planned terminal job RPC integration. Default mode verifies terminal action table/column prerequisites while allowing the RPC to remain pending; `--expect-rpc` is the stricter post-apply gate before runtime integration.
 
+`scripts/ops/check-rpc-sql-safety.mjs` now guards the review-only assignment and terminal SQL drafts for server-only execution posture, job-row locks, service-role grants, notification/audit durability, and care-request notification privacy before any owner-approved Supabase apply.
+
 The terminal job RPC contract checker has local mock OpenAPI regression coverage and is included in the root script tests. This lets CI prove the checker behavior without live Supabase secrets while preserving the live read-only preflight for approved environments.
 
 The API now also has a review-only terminal RPC finalizer contract in `services/api/src/jobTerminalCommand.ts`. It calls `finalize_terminal_job_rpc` with job, actor, expected-status, and next-status context, and maps database/RPC errors back to the shared workflow categories. Current routes still use the existing guarded multi-write terminal path until the Supabase function is approved and applied.
+
+Focused VM API verification for the terminal RPC finalizer contract passed: API typecheck, the focused 3-test adapter suite, and the full 62-test API suite. Full workspace root verification for the 131-file package is still pending because SSH escalation was blocked by account usage limits before VM identity guard, VM staged-package guard, root `pnpm verify`, and root `pnpm run build` could be re-run. The exact resume checklist is in `docs/release/pending-vm-verification.md`.
+
+The quick local status command is `pnpm status`, which runs `scripts/ops/show-build-status.mjs` and summarizes the beta decision, built surfaces, device blockers, and next commands without requiring a full context read.
+
+`docs/release/closed-beta-go-no-go.md` now provides the owner/operator decision packet for outside-tester beta launch. Current decision is no-go until installed-device create-request proof, full workflow proof, legal/consent readiness, notification/upload proof, and pending VM root verification are complete or explicitly accepted with written limitations.
+
+`scripts/ops/check-access-and-secrets-readiness.mjs` now guards the closed-beta access and secret-ownership gate: beta access evidence must include invite/revocation, secrets owner, rotation procedure, runtime env owner, emergency revocation path, and no-secrets-in-evidence confirmation. It also guards the deployment runbook, mobile build readiness, go/no-go packet, and verification matrix language around scoped approval and server-only secrets. It has local regression coverage in `scripts/ops/test/check-access-and-secrets-readiness.test.mjs`.
+
+`scripts/ops/check-legal-consent-readiness.mjs` now guards the legal/consent gate: legal owner, privacy policy path, terms path, verification consent path, retention note, support/data request process, emergency language, in-app consent touchpoints, product copy review, and formal reviewer status must stay explicit in evidence before outside testers. It has local regression coverage in `scripts/ops/test/check-legal-consent-readiness.test.mjs`.
+
+`scripts/ops/check-in-app-consent-readiness.mjs` now guards the actual user-facing consent touchpoints in mobile and admin: account/support non-emergency language, patient create-request beta review and medical-chart boundary, nurse upload consent/approval language, admin verification review limitations, and product-surface trust-language coverage. It has local regression coverage in `scripts/ops/test/check-in-app-consent-readiness.test.mjs`.
+
+`scripts/ops/check-private-document-path-hygiene.mjs` now guards verification-document privacy: mobile display types no longer include `storage_path`, admin dashboard queries do not select private storage paths, admin/mobile UI do not render path fields, and legal/access guards keep private-path evidence warnings visible. It has local regression coverage in `scripts/ops/test/check-private-document-path-hygiene.test.mjs`.
+
+`scripts/ops/check-notification-audit-privacy.mjs` now guards notification and audit privacy: assignment and terminal notification bodies use generic care-request language instead of user-entered request titles, review-only RPC drafts use the same generic copy, and the admin audit panel does not select or render audit metadata. It has local regression coverage in `scripts/ops/test/check-notification-audit-privacy.test.mjs`.
+
+`scripts/ops/check-api-log-hygiene.mjs` now guards the staged API/admin log surface and observability docs: local source must not log raw requests, headers, tokens, passwords, private storage paths, or care-detail fields, and the observability runbook now requires live VM Fastify logger redaction to be reverified before outside testers. It has local regression coverage in `scripts/ops/test/check-api-log-hygiene.test.mjs`.
+
+`scripts/ops/check-workflow-atomicity-readiness.mjs` now guards the workflow atomicity posture: assignment and terminal RPC rollout plans must keep the atomic database boundary, strict owner approval gate, read-only contract checks, strict `--expect-rpc` exposure checks, durable in-app notification rows, and outside-beta default of RPC-backed finalization visible. It has local regression coverage in `scripts/ops/test/check-workflow-atomicity-readiness.test.mjs`.
+
+`scripts/ops/check-canonical-assignment-readiness.mjs` now guards the assignment source-of-truth decision: production writes should converge on `jobs.assigned_nurse_user_id` as the canonical assignment field, accepted applications remain supporting evidence and compatibility state, and accepted-application-only read paths are temporary until the RPC-backed API/admin rollout is complete. It has local regression coverage in `scripts/ops/test/check-canonical-assignment-readiness.test.mjs`.
+
+`scripts/ops/check-admin-api-boundary-readiness.mjs` now guards the admin/API command-boundary target: admin assignment and terminal actions should converge on the same RPC-backed finalizer contracts as API routes before outside beta, while admin-only nurse verification may remain in the protected admin server path with audit and notification coverage. It has local regression coverage in `scripts/ops/test/check-admin-api-boundary-readiness.test.mjs`.
+
+`scripts/ops/check-production-sequence-readiness.mjs` now guards the production execution order: installed-device create-request proof stays first, RPC-backed assignment/terminal finalizer work becomes the default engineering gate before outside beta, and broad UI redesign stays behind proof while focused role-specific workflow surfaces remain allowed. It has local regression coverage in `scripts/ops/test/check-production-sequence-readiness.test.mjs`.
+
+`docs/release/beta-evidence-templates.md` now provides copy-ready evidence blocks for the closed-beta gates, including create-request debug, workflow smoke, patient/nurse real-device proof, admin web proof, notifications, verification upload, access rules, monitoring owner, legal/consent, restore drill, and final go/no-go decision.
+
+`scripts/ops/check-beta-gates.mjs` now guards the no-go status, current blocker language, required VM resume commands, and current staged-package count before outside testers are invited. It has local regression coverage in `scripts/ops/test/check-beta-gates.test.mjs`.
+
+`scripts/ops/check-beta-ops-readiness.mjs` now guards the closed-beta operations playbook, monitoring owner evidence template, go/no-go support ownership gate, legal support/escalation language, and current "not assigned" operational blockers. It has local regression coverage in `scripts/ops/test/check-beta-ops-readiness.test.mjs`.
+
+`scripts/ops/check-release-doc-links.mjs` now guards the release-doc cross-links, required beta evidence template headings, pending VM verification commands, and current staged-package count. It has local regression coverage in `scripts/ops/test/check-release-doc-links.test.mjs`.
+
+`scripts/ops/check-mobile-secret-hygiene.mjs` now guards mobile source/config against server-only secret markers, unapproved public env vars, and copy-token/debug-token UI. The old token screen now shows only session status, and the old API health test no longer sends a bearer token to `/health`. The guard has local regression coverage in `scripts/ops/test/check-mobile-secret-hygiene.test.mjs`.
+
+`scripts/ops/check-trust-language.mjs` now guards product surfaces against unsupported trust, compliance, insurance, background-check, license-verification, emergency-care, and guarantee claims while allowing explicit closed-beta disclaimers such as "not an emergency service" and "does not claim background-check or license-verification completion." It has local regression coverage in `scripts/ops/test/check-trust-language.test.mjs`.
+
+`scripts/ops/check-mobile-support-snapshot.mjs` now guards the mobile support snapshot while full mobile tests are unavailable locally: it verifies the copied fields, UI placement, privacy test coverage, and release note language without requiring workspace dependencies. It has local regression coverage in `scripts/ops/test/check-mobile-support-snapshot.test.mjs`.
+
+`scripts/ops/check-nursebridge-isolation.mjs` now guards NurseBridge-only app identifiers, API/admin domains, VM deployment path, systemd service names, and runtime/mobile config against Pathfinder contamination while still allowing explicit "do not touch Pathfinder" policy language. It has local regression coverage in `scripts/ops/test/check-nursebridge-isolation.test.mjs`.
+
+`scripts/ops/check-real-device-proof-readiness.mjs` now guards the iPhone and Android create-request capture packets so installed-device proof collects the mobile support snapshot, keeps token/private-care-detail warnings visible, and preserves the Expo/React Native plus installed-build architecture decision. It has local regression coverage in `scripts/ops/test/check-real-device-proof-readiness.test.mjs`.
+
+`scripts/ops/check-restore-drill-readiness.mjs` now guards the backup/restore beta gate, restore drill evidence template, closed-beta operations playbook requirement, Supabase restore-drill safety rules, go/no-go restore proof language, and verification matrix restore gate. It has local regression coverage in `scripts/ops/test/check-restore-drill-readiness.test.mjs`.
+
+`scripts/ops/check-workflow-smoke-readiness.mjs` now guards the controlled workflow smoke path so the mutating smoke remains production-gated, preflight remains non-mutating, patient/nurse/admin token role checks remain explicit, request IDs remain evidence-ready, and completion/cancellation/wrong-role checks stay documented. It has local regression coverage in `scripts/ops/test/check-workflow-smoke-readiness.test.mjs`.
 
 Shared assignment planning now lives in `@nursebridge/shared/workflow`: selected application planning, competing nurse rejection recipients, and assignment notification payloads are shared by API/admin paths instead of being rebuilt independently.
 
@@ -108,6 +162,8 @@ Patient and nurse mobile tabs now include Account. The Account panel shows beta 
 Patient and nurse identity/sign-out details now live in the Account tab instead of appearing above every workflow screen. Admin mobile keeps the signed-in panel because admin work is intentionally directed to the protected web console rather than a role-tab mobile flow.
 
 Patient Home now includes a support/safety panel so the non-emergency boundary and beta support path are visible beside the current request status, not hidden only inside Account.
+
+The mobile header now includes a copyable support snapshot with role, API state, focused request ID/status, record count, and unread update count. The snapshot deliberately avoids copying request title, address, description, mobility notes, or other care details, and its formatter is covered by mobile workflow tests.
 
 Patient and nurse request detail screens now share one mobile workflow detail shell for status, summary, safe fields, timeline, actions, and final-record language. This keeps role-specific screens consistent while the product moves away from one-off dashboard panels.
 

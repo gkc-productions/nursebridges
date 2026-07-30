@@ -5,6 +5,7 @@ This is the operating sequence for moving NurseBridge from the current VM build 
 Use `docs/ops/closed-beta-ops-playbook.md` for monitoring roles, severity levels, support response, stop conditions, and incident intake during closed beta.
 Use `docs/legal/beta-legal-consent-checklist.md` for the privacy, terms, verification consent, data retention, support, and copy-review gate before inviting outside testers.
 Use `docs/release/beta-verification-matrix.md` to confirm the evidence required before each beta gate advances.
+Use `docs/release/beta-evidence-templates.md` to copy the correct evidence block into the evidence log.
 
 ## Operating Rules
 

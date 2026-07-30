@@ -2,6 +2,9 @@
 
 This matrix defines what evidence is required before NurseBridge can move from current build state into controlled closed beta. It complements `docs/release/beta-readiness.md` and `docs/release/beta-evidence-log.md`.
 
+Use `docs/release/closed-beta-go-no-go.md` for the final owner/operator beta decision. This matrix defines evidence quality; the go/no-go packet defines whether the collected evidence is enough to invite outside testers.
+Use `docs/release/beta-evidence-templates.md` to copy the evidence block that matches each gate.
+
 ## Evidence Rule
 
 Do not mark a readiness item complete unless the evidence proves the actual requirement.
@@ -17,12 +20,13 @@ Examples:
 
 ```text
 Gate 0: staged docs synced
-        -> Gate 1: create-job fixed
+        -> Gate 1: create-request proven
         -> Gate 2: API workflow smoke passed
         -> Gate 3: real-device patient/nurse/admin proof
         -> Gate 4: notifications and verification upload proof
-        -> Gate 5: ops/legal/access/restore readiness
-        -> Gate 6: tiny controlled beta
+        -> Gate 5: workflow boundary and atomicity approved
+        -> Gate 6: ops/legal/access/restore readiness
+        -> Gate 7: tiny controlled beta
 ```
 
 ## Gate Matrix
@@ -30,8 +34,8 @@ Gate 0: staged docs synced
 | Gate | Requirement | Required Evidence | Record In |
 | --- | --- | --- | --- |
 | Gate 0 | Staged docs are synced to VM | `git status --short` and `rg` references after copy | `docs/release/beta-evidence-log.md` general entry |
-| Gate 1 | Real-device create-job result captured after deployed fix | Fresh installed iOS/internal build attempt or Android attempt, copied reference if failed, safe log event | Create-job debug evidence |
-| Gate 1 | Mobile create-job fixed/proven | Real-device patient creates request, request visible through job list or `GET /jobs`, job is `open` | Create-job debug evidence + patient real-device evidence |
+| Gate 1 | Real-device create-request result captured after deployed fix | Fresh installed iOS/internal build attempt or Android attempt, copied reference if failed, safe log event | Create-request debug evidence |
+| Gate 1 | Mobile create-request fixed/proven | Real-device patient creates request, request visible through job list or `GET /jobs`, job is `open` | Create-request debug evidence + patient real-device evidence |
 | Gate 1 | Regression coverage added | Focused test result and `pnpm verify` pass | Create-job debug evidence |
 | Gate 2 | Completion workflow works through API | Approved smoke: patient create, nurse apply, admin assign, nurse complete | Workflow smoke evidence |
 | Gate 2 | Cancellation workflow works through API | Approved smoke: patient/admin cancel, pending apps rejected, terminal guards pass | Workflow smoke evidence |
@@ -42,27 +46,31 @@ Gate 0: staged docs synced
 | Gate 4 | In-app notifications work | Notification visible for workflow events | Notification evidence |
 | Gate 4 | Push delivery tested | Expo push result on real Android and iOS device, pass or recorded follow-up | Notification evidence |
 | Gate 4 | Nurse verification upload works | Real-device metadata creation, signed upload, private bucket/admin review | Nurse verification upload evidence |
-| Gate 5 | Beta access rules confirmed | Cloudflare/admin/tester access rule evidence | Beta access rules evidence |
-| Gate 5 | Monitoring owner assigned | Named owner, monitoring window, response expectation | Monitoring owner evidence |
-| Gate 5 | Restore drill completed | Non-production restore drill result | Restore drill evidence |
-| Gate 5 | Legal/consent gate reviewed | Privacy, terms, verification consent, retention, support path, copy review | Legal/consent evidence |
-| Gate 6 | Controlled beta launch approved | Beta owner go/no-go, tester list, monitoring window, stop condition | General beta session evidence |
+| Gate 5 | Assignment source of truth verified | `jobs.assigned_nurse_user_id` confirmed as canonical, accepted application treated as supporting evidence | Workflow boundary evidence |
+| Gate 5 | RPC-backed assignment/terminal finalizers approved or explicitly excepted | Assignment and terminal RPC checks, finalizer integration proof, or written owner exception | Workflow boundary evidence |
+| Gate 5 | Admin/API lifecycle boundary converged | API/admin assignment/cancel/complete use the same finalizer contracts, or owner signs a written limitation | Workflow boundary evidence |
+| Gate 6 | Beta access rules confirmed | Cloudflare/admin/tester access rule evidence | Beta access rules evidence |
+| Gate 6 | Monitoring owner assigned | Named owner, monitoring window, response expectation | Monitoring owner evidence |
+| Gate 6 | Restore drill completed | Non-production restore drill result | Restore drill evidence |
+| Gate 6 | Legal/consent gate reviewed | Privacy, terms, verification consent, retention, support path, copy review | Legal/consent evidence |
+| Gate 7 | Controlled beta launch approved | Beta owner go/no-go, tester list, monitoring window, stop condition | General beta session evidence |
 
 ## Minimum Closed-Beta Evidence Set
 
 Before inviting outside testers, collect at least:
 
-1. Create-job debug evidence showing mobile create-job is proven after the deployed backend fix.
+1. Create-request debug evidence showing mobile create-request is proven after the deployed backend fix.
 2. Workflow smoke evidence showing completion and cancellation paths.
 3. Patient real-device evidence.
 4. Nurse real-device evidence.
 5. Admin web evidence.
 6. Notification evidence for in-app notifications.
 7. Nurse verification upload evidence.
-8. Beta access rules evidence.
-9. Monitoring owner evidence.
-10. Restore drill evidence.
-11. Legal/consent evidence.
+8. Workflow boundary evidence for canonical assignment, RPC-backed finalizers, and admin/API convergence or written owner exceptions.
+9. Beta access rules evidence.
+10. Monitoring owner evidence.
+11. Restore drill evidence.
+12. Legal/consent evidence.
 
 Push delivery can remain a follow-up only if in-app notifications and visible status are reliable and the beta owner explicitly accepts that limitation for the closed beta.
 
@@ -93,9 +101,10 @@ Weak evidence:
 
 As of this staged local pass:
 
-- Gate 1 is blocked by missing real-device create-job proof after the deployed backend fix.
-- Gate 2 is blocked until create-job is proven on a real device.
+- Gate 1 is blocked by missing real-device create-request proof after the deployed backend fix.
+- Gate 2 is blocked until create-request is proven on a real device.
 - Gate 3 is blocked until API workflow is proven and real-device checks run.
 - Gate 4 is blocked by missing real-device notification/upload proof.
-- Gate 5 is blocked by missing owner/access/restore/legal evidence.
-- Gate 6 is blocked until gates 1 through 5 are proven or explicitly accepted with documented limitations.
+- Gate 5 is blocked by missing workflow boundary/atomicity evidence or written owner exception.
+- Gate 6 is blocked by missing owner/access/restore/legal evidence.
+- Gate 7 is blocked until gates 1 through 6 are proven or explicitly accepted with documented limitations.

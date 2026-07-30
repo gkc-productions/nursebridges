@@ -4,6 +4,7 @@ This is the navigation index for the current NurseBridge production-track planni
 
 ## Current Truth
 
+- Run `pnpm status` for the quick local build status summary before reading the longer packet.
 - The actual repo lives on `nursebridge-vm` at `/home/nurseapp/nursebridge`.
 - This local `vm-stage` folder is the guarded local staging copy used for scoped VM sync and verification.
 - Closed beta is still blocked by missing real-device proof of patient create-request and the full patient -> nurse -> admin workflow.
@@ -89,7 +90,7 @@ This is the navigation index for the current NurseBridge production-track planni
 
 ## What Not To Do Next
 
-- Do not start broad UI redesign before create-job is fixed.
+- Do not start broad UI redesign before installed-device create-request proof exists.
 - Do not migrate infrastructure while the core workflow is unproven.
 - Do not broaden into payments, marketplace mechanics, chat, ratings, claims, insurance, or partner dashboards.
 - Do not mark readiness items complete without evidence.

@@ -123,6 +123,5 @@ If a deployed RPC path fails:
 
 ## Open Decisions
 
-- Confirm the canonical assignment field is `jobs.assigned_nurse_user_id`.
 - Decide whether audit rows for patient acceptance should be written inside a broader RPC variant or remain in API after a successful RPC.
 - Decide whether a dedicated non-exposed server DB role should replace direct `service_role` RPC execution later.

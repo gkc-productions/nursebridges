@@ -30,7 +30,7 @@ Use `requestId` to correlate client failures with server logs.
 
 ## Debug Create-Job Failures
 
-The active closed-beta blocker is Android `POST /jobs` returning `400`. Use the safe log watcher after reproducing the issue from the Android app:
+The active closed-beta blocker is fresh installed-device create-request proof after the deployed backend fix. Use the safe log watcher after reproducing a create-request attempt from an approved iOS internal/TestFlight build or recovered Android install:
 
 ```sh
 scripts/ops/watch-create-job-logs.sh "15 minutes ago"
@@ -38,7 +38,7 @@ scripts/ops/watch-create-job-logs.sh "15 minutes ago"
 
 The watcher filters to create-job diagnostics and structured `POST /jobs` request events, so unrelated health checks should not appear.
 
-If the Android app shows a `Reference: mobile-...` value, filter directly to that request:
+If the mobile app shows a `Reference: mobile-...` value, filter directly to that request:
 
 ```sh
 scripts/ops/watch-create-job-logs.sh "30 minutes ago" "mobile-example-request-id"
@@ -52,13 +52,15 @@ Relevant events:
 
 Expected workflow:
 
-1. Trigger one create-job attempt from the Android app.
+1. Trigger one create-request attempt from the installed mobile app.
 2. Copy the `Reference: mobile-...` value from the app error if it appears.
 3. Run the watcher immediately, passing that reference as the second argument when available.
 4. Capture the `requestId`, event name, issue path/message, or Supabase error code/message.
 5. Fix the exact validation, RLS, constraint, or schema issue shown in the log.
 
 Do not capture Authorization headers, bearer tokens, refresh tokens, Supabase keys, or raw request bodies.
+
+Before inviting outside testers, reverify the live VM Fastify logger configuration redacts authorization, cookie, token-like, password-like, and private document path fields. The local staged API snapshot does not include every VM bootstrap file, so VM logger redaction must be checked on `/home/nurseapp/nursebridge` during the pending root verification.
 
 ## Test Health
 

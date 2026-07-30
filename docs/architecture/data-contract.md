@@ -106,15 +106,15 @@ Required beta fields by behavior:
 - Requested time/window.
 - Optional hourly rate only if beta operation uses it.
 - Created/updated timestamps.
-- Assignment representation, either:
-  - accepted application, or
-  - `assigned_nurse_user_id`, or
-  - both if current schema requires compatibility.
+- Assignment representation:
+  - production canonical field: `jobs.assigned_nurse_user_id`;
+  - supporting evidence: exactly one accepted application for the assigned nurse/caregiver;
+  - compatibility-only reads may derive assignment from accepted applications until the RPC-backed API/admin rollout is complete.
 
 Current known risk:
 
-- Assignment may be represented through accepted application state and possibly `assigned_nurse_user_id`.
-- Before broader beta, choose one canonical assignment representation and make the other derived or compatibility-only.
+- Some current read paths may still derive assignment from accepted application state for compatibility.
+- Before broader beta, writes should converge on `jobs.assigned_nurse_user_id` as canonical and treat accepted applications as supporting evidence, not a second source of truth.
 
 Create-job insert contract:
 
@@ -126,7 +126,8 @@ Do not depend on:
 
 - Client-provided status.
 - Client-provided patient ownership.
-- Assignment fields being present until the exact production schema is verified.
+- Client-provided assignment fields.
+- Accepted application state as the only production assignment source after RPC-backed assignment is enabled.
 
 ## Applications
 

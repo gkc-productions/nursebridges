@@ -98,10 +98,10 @@ begin
     into v_job;
 
   v_notification_title := case
-    when p_next_status = 'cancelled' then 'Job cancelled'
-    else 'Job completed'
+    when p_next_status = 'cancelled' then 'Care request cancelled'
+    else 'Care request completed'
   end;
-  v_notification_body := coalesce(v_job.title, 'Job') || ' is now ' || p_next_status || '.';
+  v_notification_body := 'A care request is now ' || p_next_status || '.';
 
   if v_job.patient_user_id is not null then
     insert into public.notifications (user_id, type, title, body, entity_type, entity_id)

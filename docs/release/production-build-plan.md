@@ -6,6 +6,7 @@ Use `docs/release/implementation-backlog.md` for the ordered engineering work pa
 Use `docs/architecture/adrs/0001-product-architecture-decisions.md` for the current architecture decisions and revisit triggers.
 Use `docs/architecture/lead-engineering-blueprint.md` for the current lead-engineering answer to what to build high level, what stays mobile/web, and how work is sequenced while installed-device proof is blocked.
 Use `docs/release/beta-verification-matrix.md` to verify the evidence required before beta gates move forward.
+Use `docs/release/closed-beta-go-no-go.md` for the owner/operator decision before inviting outside testers.
 Use `docs/ops/mobile-beta-build-readiness.md` before requesting or running any Expo/EAS beta build.
 Use `docs/architecture/workflow-source-of-truth.md` before consolidating duplicated lifecycle or assignment behavior.
 
@@ -62,7 +63,7 @@ Engineering focus:
 
 1. Resolve iOS signing for `com.nursebridges.mobile` or recover Android access.
 2. Install one real beta build.
-3. Prove create-job, list jobs, notifications, nurse apply, admin assign, complete, and cancel.
+3. Prove create-request, list requests, notifications, nurse apply, admin assign, complete, and cancel.
 4. Patch only evidence-backed workflow defects.
 5. Tighten mobile and admin UI around the proven paths.
 
@@ -101,7 +102,7 @@ Engineering focus:
 | --- | --- | --- |
 | Apple signing blocks installed iOS proof | Active blocker | Use `com.nursebridges.mobile`, sign into team `R2N3CHKSBB`, create/download matching development profile, keep unsigned Xcode builds green. |
 | Workflow looks proven only in tests | Active risk | Require installed-device evidence for create/apply/assign/complete/cancel before beta claims. |
-| API/admin lifecycle drift creates unsafe states | Known technical debt | Use `docs/architecture/workflow-source-of-truth.md`; consolidate before broader beta or force admin through canonical API endpoints. |
+| API/admin lifecycle drift creates unsafe states | Known technical debt | Use `docs/architecture/workflow-source-of-truth.md`; converge assignment/cancel/complete on RPC-backed finalizer contracts before outside beta unless the owner signs a written exception. |
 | Supabase schema drift breaks runtime behavior | Known technical debt | Verify `docs/architecture/data-contract.md` against production; keep DB contract checks. |
 | Product feels unserious | User-confirmed concern | Redesign around role-specific homes, clear status, restrained UI, no fake marketplace decoration. |
 | Pathfinder contamination | Explicit constraint | Keep paths, env files, services, domains, docs, and deploy actions isolated. |
@@ -119,7 +120,7 @@ Status:
 - Admin tests are passing.
 - Full `pnpm verify` passed on the VM before access was blocked.
 - API/admin runtime health was verified before access was blocked.
-- Backend create-job payload fix is deployed, but real-device create-job proof after the fix is still missing.
+- Backend create-job payload fix is deployed, but real-device create-request proof after the fix is still missing.
 - Local iOS Release compile succeeds with signing disabled and validates `com.nursebridges.mobile`.
 - Signed iPhone install is blocked by Apple account/provisioning: Xcode still has no authenticated account for team `R2N3CHKSBB` and no development profile for `com.nursebridges.mobile`.
 
@@ -136,7 +137,7 @@ Actions:
 
 Exit criteria:
 
-- Real-device patient create-job succeeds after the deployed backend fix.
+- Real-device patient create-request succeeds after the deployed backend fix.
 - The fixed failure has a regression test.
 - `pnpm verify` passes.
 - Evidence is recorded in `docs/release/beta-evidence-log.md`.
@@ -249,7 +250,7 @@ Exit criteria:
 
 ## Phase 4: Backend Consolidation
 
-Goal: reduce lifecycle drift before broader beta.
+Goal: reduce lifecycle drift before outside-tester beta.
 
 Current acceptable beta risk:
 
@@ -257,15 +258,16 @@ Current acceptable beta risk:
 
 Longer-term fix:
 
-- Move lifecycle rules into one canonical service layer used by both Fastify API and admin server routes, or make admin call canonical API endpoints for state transitions. Use `docs/architecture/workflow-source-of-truth.md` as the implementation plan.
+- Converge assignment and terminal lifecycle transitions on the same RPC-backed finalizer contracts used by Fastify API and admin server routes. Use `docs/architecture/workflow-source-of-truth.md` as the implementation plan.
 - Verify `docs/architecture/data-contract.md` against production and add database contract checks around canonical job/application fields.
-- Clarify canonical assignment representation.
+- Keep `jobs.assigned_nurse_user_id` as the canonical assignment representation.
 - Keep logs structured and safe.
 
 Exit criteria:
 
 - One canonical job lifecycle implementation.
 - One canonical assignment implementation.
+- API/admin assignment and terminal actions use RPC-backed finalizer contracts by default.
 - Tests cover patient, nurse, admin, stale-write, wrong-role, and terminal-state cases.
 
 ## Phase 5: Operational Readiness

@@ -254,7 +254,7 @@ If any answer is no, do not run the session.
 As of this local-only staged pass:
 
 - Closed beta is not ready.
-- Android create-job remains the active blocker.
+- Installed-device create-request proof remains the active blocker after the deployed backend fix.
 - Monitoring owner and response expectations are not yet assigned.
 - Restore drill evidence is missing.
 - Legal/privacy/terms/verification consent are not finalized.

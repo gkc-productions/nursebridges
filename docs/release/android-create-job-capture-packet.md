@@ -8,6 +8,8 @@ The installed Android app previously could log in, and `GET /jobs` plus `GET /no
 
 The backend payload fix for live `jobs.created_by` schema drift is deployed and verified. Backend diagnostics remain in place. The next useful Android evidence is one fresh Android patient create-job attempt after the deployed fix.
 
+The installed Android app must point at `https://api.nursebridges.com` for this proof. Do not use a local, Pathfinder, or unknown API base URL.
+
 ## Tester Script
 
 Use a patient beta account.
@@ -15,12 +17,13 @@ Use a patient beta account.
 1. Open the Android app.
 2. Sign in as the patient tester.
 3. Confirm the app reaches the patient area.
-4. Start one care support request.
-5. Fill the required fields with non-sensitive test data.
-6. Submit once.
-7. If it succeeds, confirm the new request appears in the patient request list with `open` status.
-8. If it fails, tap `Copy issue details`.
-9. Paste the result into the engineering thread.
+4. Tap `Copy` in the `Support snapshot` panel and keep the copied text for evidence.
+5. Start one care support request.
+6. Fill the required fields with non-sensitive test data.
+7. Submit once.
+8. If it succeeds, confirm the new request appears in the patient request list with `open` status, then tap `Copy` in the `Support snapshot` panel again.
+9. If it fails, tap `Copy issue details`.
+10. Paste the support snapshot and any copied issue details into the engineering thread.
 
 Do not retry repeatedly unless engineering asks.
 
@@ -50,10 +53,12 @@ Do not enter:
 Send:
 
 - Copied issue details from the app.
+- Copied `Support snapshot` text from the app.
 - Tester role: patient.
 - Device model if known.
 - Approximate time and timezone.
 - App/build if visible.
+- Environment/API target: `https://api.nursebridges.com`.
 - Whether login still works.
 - Whether job list still loads.
 - Whether the new request appears in the patient list.
@@ -131,9 +136,10 @@ Tester:
 Role: patient
 Device/platform: Android
 App/build:
-Environment:
+Environment: https://api.nursebridges.com
 Workflow: patient create care request
 Copied issue reference:
+Support snapshot:
 Watcher command:
 Log event:
 Request ID:

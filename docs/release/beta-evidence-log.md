@@ -5,8 +5,326 @@ Use this file to record evidence for closed-beta readiness. Do not mark `docs/re
 Do not paste secrets, bearer tokens, cookies, passwords, service keys, private document paths, or raw medical details.
 
 Use `docs/release/beta-verification-matrix.md` to decide which evidence template is required for each gate.
+Use `docs/release/beta-evidence-templates.md` when copying a fresh evidence block into this log.
 
 ## Engineering Evidence
+
+### Quick build status command
+
+```text
+Date/time: 2026-07-30
+Timezone: America/New_York
+Runner: Codex
+Scope: Project visibility after context resets
+Change: Added a quick local `pnpm status` command that prints the current NurseBridge closed-beta decision, built surfaces, staged package count, device blockers, and next commands. Updated start-here/current-status/handoff docs so the command becomes the first status entrypoint instead of requiring a long document read after every reset.
+Files: scripts/ops/show-build-status.mjs, scripts/ops/test/show-build-status.test.mjs, package.json, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/start-here.md, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
+Verification:
+- Local `pnpm status` command passed and printed the current beta decision, staged package count, built surfaces, phone blockers, and next commands.
+- Local staged-package guard passed for 131 staged files.
+- Local release doc link guard passed.
+- Local beta gate guard passed.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: Keep `pnpm status` focused on current proof blockers; do not let it become another long release doc.
+```
+
+### Android install preflight and iOS team alignment
+
+```text
+Date/time: 2026-07-30
+Timezone: America/New_York
+Runner: Codex
+Scope: Real-device installed-build preflight readiness
+Change: Added a read-only Android install preflight command and package script. Corrected the local iOS Xcode project team from `HKQJ75SQVF` to the documented NurseBridge Apple team `R2N3CHKSBB`, reducing iOS installed-build preflight blockers to the missing provisioning profile for `com.nursebridges.mobile`.
+Files: apps/mobile/scripts/verify-android-install-preflight.mjs, apps/mobile/package.json, apps/mobile/ios/NurseBridge.xcodeproj/project.pbxproj, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
+Verification:
+- iOS install preflight passed source identity, Xcode build settings, physical iPhone visibility, and signing identity; failed only on missing provisioning profile for `com.nursebridges.mobile`.
+- Android install preflight initially proved `adb` was missing. After installing Android platform-tools, the preflight passed source identity and `adb` availability, then failed because no authorized Android device was visible to `adb devices -l`.
+- Local staged-package guard passed for 129 staged files.
+- Local release doc link guard passed.
+- Local beta gate guard passed.
+- Local real-device proof readiness guard passed.
+- Local ops guard tests passed with 21/21 suites.
+Result: Local pass; real-device create-request proof still blocked by iOS provisioning profile or Android device authorization/visibility.
+Follow-up issue: Install/download the iOS provisioning profile for `com.nursebridges.mobile` or make the Android phone visible to adb by enabling USB debugging, accepting the trust prompt, using a data-capable cable, and confirming `adb devices -l` shows an authorized device.
+```
+
+### RPC SQL safety guard
+
+```text
+Date/time: 2026-07-29
+Timezone: America/New_York
+Runner: Codex
+Scope: Review-only assignment and terminal RPC SQL deployment posture
+Change: Added a dependency-free guard that checks both RPC SQL drafts for SECURITY DEFINER plus explicit search_path, job-row locks, service-role-only execute grants, revokes from anon/authenticated, durable notification/audit writes, stable workflow exceptions, and care-request notification privacy. Added regression coverage so root tests catch unsafe SQL drift before any owner-approved Supabase apply.
+Files: scripts/ops/check-rpc-sql-safety.mjs, scripts/ops/test/check-rpc-sql-safety.test.mjs, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
+Verification:
+- Local RPC SQL safety guard passed.
+- Local staged-package guard passed for 128 staged files.
+- Local release doc link guard passed.
+- Local beta gate guard passed.
+- Local ops guard tests passed with 21/21 suites.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: Re-run on the VM before any approved Supabase function apply, then run the strict RPC exposure checks after apply.
+```
+
+### Beta verification matrix workflow-boundary gate
+
+```text
+Date/time: 2026-07-29
+Timezone: America/New_York
+Runner: Codex
+Scope: Closed-beta evidence gate alignment
+Change: Added a dedicated workflow boundary/atomicity gate to the beta verification matrix before ops/legal/access/restore readiness. The matrix now requires evidence for canonical assignment, RPC-backed assignment/terminal finalizers or written owner exception, and admin/API lifecycle boundary convergence before outside beta. Added a Workflow Boundary Evidence template and extended release-doc, access/secrets, legal/consent, and restore guards to the updated gate numbering.
+Files: docs/release/beta-verification-matrix.md, docs/release/beta-evidence-templates.md, scripts/ops/check-release-doc-links.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-access-and-secrets-readiness.mjs, scripts/ops/check-legal-consent-readiness.mjs, scripts/ops/check-restore-drill-readiness.mjs, docs/release/beta-evidence-log.md
+Verification:
+- Local release doc link guard passed.
+- Local beta gate guard passed.
+- Local access/secrets, legal/consent, and restore readiness guards passed.
+- Local ops guard tests passed with 20/20 suites.
+- Local staged-package guard passed for 126 staged files.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: Collect Workflow Boundary Evidence after approved VM/Supabase reconciliation and RPC finalizer rollout or owner-signed exception.
+```
+
+### Production sequence readiness guard
+
+```text
+Date/time: 2026-07-29
+Timezone: America/New_York
+Runner: Codex
+Scope: Production-track execution order
+Change: Updated the implementation backlog and production build plan so the execution path stays ordered around installed-device create-request proof, full workflow proof, RPC-backed assignment/terminal finalizers plus admin/API boundary convergence before outside beta, then focused patient/nurse/admin product hardening. Added a dependency-free guard that prevents the track from drifting back to broad UI redesign before proof or vague backend consolidation before outside beta.
+Files: scripts/ops/check-production-sequence-readiness.mjs, scripts/ops/test/check-production-sequence-readiness.test.mjs, docs/release/implementation-backlog.md, docs/release/production-build-plan.md, docs/release/start-here.md, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
+Verification:
+- Local production sequence readiness guard passed.
+- Local ops guard tests passed with 20/20 suites.
+- Local staged-package guard passed for 126 staged files.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: Keep broad UI redesign behind installed-device workflow proof; continue only focused role-specific workflow surface work until create-request evidence exists.
+```
+
+### Active blocker wording refresh
+
+```text
+Date/time: 2026-07-29
+Timezone: America/New_York
+Runner: Codex
+Scope: Operational runbook accuracy for create-request proof
+Change: Refreshed active operational docs so the current blocker is described as missing installed-device create-request proof after the deployed backend fix, not only the older Android `POST /jobs` 400 observation. Historical Android/iPhone capture packets still preserve the original POST /jobs context. Updated beta-ops and API log hygiene guards so the current proof path names approved iOS internal/TestFlight or recovered Android install.
+Files: docs/ops/observability.md, docs/ops/closed-beta-ops-playbook.md, docs/ops/deployment-runbook.md, docs/release/vm-sync-handoff.md, scripts/ops/check-beta-ops-readiness.mjs, scripts/ops/check-api-log-hygiene.mjs, docs/release/beta-evidence-log.md
+Verification:
+- Local beta operations readiness guard passed.
+- Local API log hygiene guard passed.
+- Local ops guard tests passed with 19/19 suites.
+- Local staged-package guard passed for 124 staged files.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: Capture one real installed-device create-request attempt from approved iOS internal/TestFlight or recovered Android access, then inspect safe logs by request reference if it fails.
+```
+
+### Admin/API boundary readiness guard
+
+```text
+Date/time: 2026-07-29
+Timezone: America/New_York
+Runner: Codex
+Scope: Admin/API lifecycle command-boundary convergence
+Change: Tightened the architecture target so admin assignment/cancel/complete converge on the same RPC-backed finalizer contracts as API routes before outside beta, while admin-only nurse verification can remain in the protected admin server path with audit and notification coverage. Added a dependency-free guard that keeps the current admin/API route split visible and prevents the convergence target from drifting back to vague shared-logic language.
+Files: scripts/ops/check-admin-api-boundary-readiness.mjs, scripts/ops/test/check-admin-api-boundary-readiness.test.mjs, docs/architecture/workflow-source-of-truth.md, docs/architecture/production-architecture.md, docs/release/beta-readiness.md, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
+Verification:
+- Local admin/API boundary readiness guard passed.
+- Local ops guard tests passed with 19/19 suites.
+- Local staged-package guard passed for 124 staged files.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: During approved VM reconciliation, wire admin assignment and terminal actions to the same RPC-backed finalizer contracts as API while preserving admin-only verification as a protected admin service.
+```
+
+### Canonical assignment readiness guard
+
+```text
+Date/time: 2026-07-29
+Timezone: America/New_York
+Runner: Codex
+Scope: Production assignment source-of-truth decision
+Change: Documented `jobs.assigned_nurse_user_id` as the production canonical assignment field and accepted application state as supporting evidence/compatibility state. Updated the data contract, workflow source-of-truth plan, Supabase verification runbook, assignment RPC rollout plan, and beta readiness checklist. Added a dependency-free guard that keeps the canonical assignment decision, live Supabase recheck, RPC draft write target, assignment contract check, and current compatibility surfaces visible.
+Files: scripts/ops/check-canonical-assignment-readiness.mjs, scripts/ops/test/check-canonical-assignment-readiness.test.mjs, docs/architecture/data-contract.md, docs/architecture/workflow-source-of-truth.md, docs/ops/supabase-data-contract-verification.md, docs/ops/assignment-rpc-rollout-plan.md, docs/release/beta-readiness.md, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
+Verification:
+- Local canonical assignment readiness guard passed.
+- Local ops guard tests passed with 18/18 suites.
+- Local staged-package guard passed for 122 staged files.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: Reverify live Supabase exposes `jobs.assigned_nurse_user_id`, then reconcile accepted-application-only read paths during the RPC-backed API/admin rollout.
+```
+
+### Workflow atomicity readiness guard
+
+```text
+Date/time: 2026-07-29
+Timezone: America/New_York
+Runner: Codex
+Scope: Assignment and terminal action atomicity posture before outside beta
+Change: Added a dependency-free guard that keeps the assignment and terminal RPC rollout plans aligned with the serious-product default: atomic database finalization, owner-approved apply gate, read-only prerequisite checks, strict `--expect-rpc` exposure checks after apply, durable in-app notification rows, and guarded multi-write treated as internal engineering proof unless the owner signs an outside-tester exception. Added a Workflow Atomicity section to beta readiness and removed stale terminal-RPC notification wording that conflicted with the care-request notification privacy decision.
+Files: scripts/ops/check-workflow-atomicity-readiness.mjs, scripts/ops/test/check-workflow-atomicity-readiness.test.mjs, docs/ops/terminal-job-rpc-rollout-plan.md, docs/release/beta-readiness.md, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
+Verification:
+- Local workflow atomicity readiness guard passed.
+- Local ops guard tests passed with 17/17 suites.
+- Local staged-package guard passed for 120 staged files.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: After approved VM/Supabase access returns, reconcile source, run RPC prerequisite checks, apply/wire assignment RPC first, then terminal RPC.
+```
+
+### API log hygiene guard
+
+```text
+Date/time: 2026-07-29
+Timezone: America/New_York
+Runner: Codex
+Scope: Staged API/admin log hygiene and observability runbook truthfulness
+Change: Added a dependency-free guard that scans staged API/admin source for raw request, header, token, password, private storage path, and care-detail logging. Added the observability runbook to the staged package and made the beta checklist explicit that live VM Fastify logger redaction must still be reverified before outside testers because the local staged API snapshot does not include every VM bootstrap file.
+Files: scripts/ops/check-api-log-hygiene.mjs, scripts/ops/test/check-api-log-hygiene.test.mjs, docs/ops/observability.md, docs/release/beta-readiness.md, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
+Verification:
+- Local API log hygiene guard passed.
+- Local ops guard tests passed with 16/16 suites.
+- Local staged-package guard passed for 118 staged files.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: Re-run this guard and verify live Fastify logger redaction on `/home/nurseapp/nursebridge` during approved VM root verification.
+```
+
+### Notification and audit privacy guard
+
+```text
+Date/time: 2026-07-29
+Timezone: America/New_York
+Runner: Codex
+Scope: Notification payloads, review-only RPC drafts, and admin audit display minimization
+Change: Replaced assignment and terminal notification bodies that repeated user-entered request titles with generic care-request language. Updated the review-only assignment and terminal RPC drafts to use the same generic notification copy. Added a dependency-free guard that keeps notification bodies from leaking request titles and confirms the admin audit panel does not select or render audit metadata.
+Files: packages/shared/src/workflow.ts, packages/shared/test/workflow.test.ts, docs/architecture/sql/assignment-finalize-rpc.draft.sql, docs/architecture/sql/terminal-job-finalize-rpc.draft.sql, scripts/ops/check-notification-audit-privacy.mjs, scripts/ops/test/check-notification-audit-privacy.test.mjs, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
+Verification:
+- Local notification and audit privacy guard passed.
+- Local ops guard tests passed with 15/15 suites.
+- Local staged-package guard passed for 115 staged files.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: Confirm live notification rows and admin audit display use only safe summaries during approved workflow proof.
+```
+
+### Private document path hygiene guard
+
+```text
+Date/time: 2026-07-29
+Timezone: America/New_York
+Runner: Codex
+Scope: Verification document privacy and display minimization
+Change: Removed `storage_path` from the mobile verification document display row type and added a dependency-free guard that keeps private verification storage paths out of mobile/admin display surfaces. The guard also confirms admin dashboard queries select only verification metadata, mobile upload paths remain limited to the upload/cleanup flow, and legal/access docs keep private-path warnings visible.
+Files: apps/mobile/src/types.ts, scripts/ops/check-private-document-path-hygiene.mjs, scripts/ops/test/check-private-document-path-hygiene.test.mjs, docs/legal/beta-legal-consent-checklist.md, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
+Verification:
+- Local private document path hygiene guard passed.
+- Local staged-package guard passed for 113 staged files.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: Confirm live API/admin responses do not expose private verification storage paths during approved VM/root verification and admin proof.
+```
+
+### In-app consent readiness guard
+
+```text
+Date/time: 2026-07-29
+Timezone: America/New_York
+Runner: Codex
+Scope: Patient, nurse, admin, and support consent touchpoints
+Change: Tightened mobile patient create-request copy to say requests are for closed-beta review and not a full medical chart or emergency service. Tightened nurse verification upload copy to say document sharing is for beta review, approval is not automatic, and no background-check/license-verification completion is claimed. Tightened admin verification queue copy to warn operators not to expose private paths and not to treat beta eligibility as a background-check or license-verification claim. Added a dependency-free guard over these in-app consent touchpoints.
+Files: apps/mobile/App.tsx, apps/admin/app/page.tsx, scripts/ops/check-in-app-consent-readiness.mjs, scripts/ops/test/check-in-app-consent-readiness.test.mjs, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
+Verification:
+- Local in-app consent readiness guard passed.
+- Local ops guard tests passed with 13/13 suites.
+- Local staged-package guard passed for 110 staged files.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: Final legal/privacy review must still approve these touchpoints before outside testers.
+```
+
+### Legal and consent readiness guard
+
+```text
+Date/time: 2026-07-29
+Timezone: America/New_York
+Runner: Codex
+Scope: Closed-beta legal, consent, retention, support, and copy-review readiness
+Change: Added a dependency-free legal and consent readiness guard that keeps the legal owner, privacy policy path, terms path, verification consent path, retention note, support/data request process, emergency language, in-app consent touchpoints, product copy review, and formal reviewer status explicit before outside testers.
+Files: scripts/ops/check-legal-consent-readiness.mjs, scripts/ops/test/check-legal-consent-readiness.test.mjs, docs/release/beta-evidence-templates.md, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
+Verification:
+- Local legal and consent readiness guard passed.
+- Local ops guard tests passed with 12/12 suites.
+- Local staged-package guard passed for 108 staged files.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: Finalize and review privacy, terms, verification document consent, data retention expectations, support/data request process, and in-app consent touchpoints before outside testers.
+```
+
+### Access and secrets readiness guard
+
+```text
+Date/time: 2026-07-29
+Timezone: America/New_York
+Runner: Codex
+Scope: Closed-beta access and secret ownership readiness
+Change: Added a dependency-free access and secrets readiness guard that keeps beta access rules, invite/revocation process, secrets owner, rotation procedure, runtime env owner, emergency revocation path, and no-secrets-in-evidence confirmation explicit before outside testers.
+Files: scripts/ops/check-access-and-secrets-readiness.mjs, scripts/ops/test/check-access-and-secrets-readiness.test.mjs, docs/release/beta-evidence-templates.md, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
+Verification:
+- Local access and secrets readiness guard passed.
+- Local ops guard tests passed with 11/11 suites.
+- Local staged-package guard passed for 106 staged files.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: Assign named access/secrets owners, confirm invite and revocation flow, confirm rotation expectations, and record `## Beta Access Rules Evidence` before outside testers.
+```
+
+### Workflow smoke readiness guard
+
+```text
+Date/time: 2026-07-29
+Timezone: America/New_York
+Runner: Codex
+Scope: Controlled closed-beta workflow smoke readiness
+Change: Added a dependency-free workflow smoke readiness guard that keeps the mutating smoke workflow production-gated and evidence-ready. The guard checks the smoke script's non-mutating preflight, patient/nurse/admin token role checks, production approval gate, requestId trace output, completion/cancellation/wrong-role assertions, smoke regression test coverage, operator runbook, beta readiness checklist, verification matrix, evidence template, and go/no-go packet.
+Files: scripts/ops/check-workflow-smoke-readiness.mjs, scripts/ops/test/check-workflow-smoke-readiness.test.mjs, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
+Verification:
+- Local workflow smoke readiness guard passed.
+- Local ops guard tests passed with 10/10 suites.
+- Local staged-package guard passed for 104 staged files.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: After installed-device create-request is proven and owner approval exists, run `scripts/ops/smoke-beta-workflow.sh --preflight`, then the approved mutating smoke, and record `## Workflow Smoke Evidence`.
+```
+
+### Restore drill readiness guard
+
+```text
+Date/time: 2026-07-29
+Timezone: America/New_York
+Runner: Codex
+Scope: Closed-beta backup/restore proof gate
+Change: Added a dependency-free restore drill readiness guard that keeps backup/restore proof visible before outside testers. The guard checks beta readiness blockers, restore drill evidence fields, closed-beta operations requirements, Supabase restore-drill safety rules, go/no-go restore proof language, and verification matrix restore gate language.
+Files: scripts/ops/check-restore-drill-readiness.mjs, scripts/ops/test/check-restore-drill-readiness.test.mjs, docs/ops/supabase-data-contract-verification.md, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
+Verification:
+- Local restore drill readiness guard passed.
+- Local ops guard tests passed with 9/9 suites.
+- Local staged-package guard passed for 104 staged files.
+- Local beta gate, release-doc link, beta operations readiness, mobile support snapshot, mobile secret hygiene, NurseBridge isolation, real-device proof readiness, and trust-language guards passed.
+Result: Local pass; VM root workspace verification/build pending.
+Follow-up issue: Complete an actual non-production Supabase restore drill and record `## Restore Drill Evidence` before outside testers.
+```
+
+### API terminal RPC finalizer contract
+
+```text
+Date/time: 2026-07-29 18:35
+Timezone: America/New_York
+Runner: Codex
+Scope: API terminal cancel/complete RPC adapter preparation
+Change: Added a review-only API terminal RPC finalizer contract for the planned `finalize_terminal_job_rpc` boundary. The adapter calls the terminal RPC with job, actor, expected-status, and next-status context and maps database/RPC errors back to shared workflow categories. Current runtime terminal routes still use the guarded multi-write path; no Supabase schema, runtime env, Cloudflare route, secret, live service, or terminal smoke path was changed.
+Files: services/api/src/jobTerminalCommand.ts, services/api/test/jobTerminalCommand.test.ts, services/api/package.json, scripts/ops/verify-vm-stage-package.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/beta-evidence-log.md
+Verification:
+- VM API typecheck passed.
+- VM focused API terminal RPC finalizer contract tests passed with 3/3 tests.
+- VM full API test suite passed with 62/62 tests.
+- Local staged-package guard passed for 102 staged files.
+Result: Focused API pass; VM root workspace verification/build pending.
+Follow-up issue: Re-run VM identity guard, staged-package guard, root `pnpm verify`, and root `pnpm run build` when SSH escalation/usage access is available.
+```
 
 ### Terminal job RPC approval package
 

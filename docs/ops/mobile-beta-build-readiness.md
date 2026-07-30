@@ -51,7 +51,7 @@ Confirm before building:
 
 Confirm before building:
 
-- API base URL points to the approved NurseBridge API, not Pathfinder.
+- API base URL points to the approved NurseBridge API, `https://api.nursebridges.com`, not Pathfinder.
 - Supabase URL and anon key point to the approved NurseBridge project.
 - No local, staging, Pathfinder, or developer-machine URLs are present in the mobile release profile.
 - Expo public environment variables are documented and match the selected beta channel.
