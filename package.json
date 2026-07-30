@@ -8,13 +8,15 @@
     "packages/*"
   ],
   "scripts": {
+    "build": "pnpm --filter @nursebridge/shared build && pnpm --filter @nursebridge/api build && pnpm --filter @nursebridge/admin build",
     "dev": "pnpm -r dev",
     "dev:api": "pnpm --filter @nursebridge/api dev",
     "dev:admin": "pnpm --filter @nursebridge/admin dev",
     "dev:mobile": "pnpm --filter @nursebridge/mobile dev",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test"
+    "typecheck": "pnpm --filter @nursebridge/shared build && pnpm -r typecheck",
+    "test": "pnpm -r test && node --test scripts/ops/test/*.test.mjs",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
     "supabase": "^2.72.8"

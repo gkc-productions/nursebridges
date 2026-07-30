@@ -1,37 +1,10 @@
 import { writeAdminAuditLog } from "../audit.js";
 import { requireAuth, requireRole } from "../auth.js";
+import { isApprovedNurse, markJobAssigned } from "../jobAssignment.js";
 import { createNotifications } from "../notifications.js";
 import { supabaseAdmin, supabaseForUser } from "../supabase.js";
 import { verifyNurseSchema } from "../validators.js";
-async function isApprovedNurse(nurseUserId) {
-    if (!supabaseAdmin)
-        return false;
-    const { data } = await supabaseAdmin
-        .from("nurse_profiles")
-        .select("verification_status")
-        .eq("nurse_id", nurseUserId)
-        .maybeSingle();
-    return data?.verification_status === "approved";
-}
-function isTerminalJobStatus(status) {
-    return status === "cancelled" || status === "completed";
-}
-async function markJobAssigned(jobId, nurseUserId) {
-    if (!supabaseAdmin)
-        return { error: new Error("Admin client not configured") };
-    const withAssignedColumn = await supabaseAdmin
-        .from("jobs")
-        .update({ status: "assigned", assigned_nurse_user_id: nurseUserId })
-        .eq("id", jobId);
-    if (!withAssignedColumn.error)
-        return { error: null };
-    const code = withAssignedColumn.error.code;
-    if (code !== "PGRST204" && code !== "42703") {
-        return { error: withAssignedColumn.error };
-    }
-    const statusOnly = await supabaseAdmin.from("jobs").update({ status: "assigned" }).eq("id", jobId);
-    return { error: statusOnly.error };
-}
+import { registerAdminAssignmentRoute } from "./adminAssignmentRoute.js";
 export async function adminRoutes(app) {
     app.get("/admin/nurses/:id/verification-documents", async (req, reply) => {
         const authed = await requireAuth(req);
@@ -108,106 +81,14 @@ export async function adminRoutes(app) {
         });
         return reply.send({ nurse_profile: nurseProfile });
     });
-    app.post("/admin/jobs/assign", async (req, reply) => {
-        const authed = await requireAuth(req);
-        requireRole(authed, ["admin"]);
-        const body = (req.body ?? {});
-        if (!body.jobId || !body.nurseUserId) {
-            return reply.code(400).send({ error: "Missing jobId or nurseUserId" });
-        }
-        if (!supabaseAdmin) {
-            return reply.code(500).send({ error: "Admin client not configured" });
-        }
-        const { data: job, error: jobError } = await supabaseAdmin
-            .from("jobs")
-            .select("id,status,title")
-            .eq("id", body.jobId)
-            .single();
-        if (jobError || !job) {
-            return reply.code(404).send({ error: "Job not found" });
-        }
-        if (isTerminalJobStatus(job.status)) {
-            return reply.code(400).send({ error: "Invalid job transition" });
-        }
-        if (!(await isApprovedNurse(body.nurseUserId))) {
-            return reply.code(403).send({ error: "Nurse verification required" });
-        }
-        const { data: applications, error: applicationsError } = await supabaseAdmin
-            .from("applications")
-            .select("id,status,nurse_user_id")
-            .eq("job_id", body.jobId);
-        if (applicationsError) {
-            return reply.code(400).send({ error: "Unable to assign job" });
-        }
-        const application = (applications ?? []).find((row) => row.nurse_user_id === body.nurseUserId);
-        if (!application) {
-            return reply.code(400).send({ error: "Nurse has not applied to this job" });
-        }
-        const rejectedNurseIds = (applications ?? [])
-            .filter((row) => row.nurse_user_id !== body.nurseUserId && row.status !== "rejected")
-            .map((row) => row.nurse_user_id)
-            .filter(Boolean);
-        const { error: applicationError } = await supabaseAdmin
-            .from("applications")
-            .select("id,status")
-            .eq("job_id", body.jobId)
-            .eq("nurse_user_id", body.nurseUserId)
-            .maybeSingle();
-        if (applicationError) {
-            return reply.code(400).send({ error: "Unable to assign job" });
-        }
-        const { error: acceptError } = await supabaseAdmin
-            .from("applications")
-            .update({ status: "accepted" })
-            .eq("job_id", body.jobId)
-            .eq("nurse_user_id", body.nurseUserId);
-        if (acceptError) {
-            return reply.code(400).send({ error: "Unable to assign job" });
-        }
-        const { error: rejectError } = await supabaseAdmin
-            .from("applications")
-            .update({ status: "rejected" })
-            .eq("job_id", body.jobId)
-            .neq("nurse_user_id", body.nurseUserId);
-        if (rejectError) {
-            return reply.code(400).send({ error: "Unable to assign job" });
-        }
-        const { error: jobUpdateError } = await markJobAssigned(body.jobId, body.nurseUserId);
-        if (jobUpdateError) {
-            return reply.code(400).send({ error: "Unable to assign job" });
-        }
-        const jobTitle = job.title || "Job";
-        await createNotifications([
-            {
-                userId: body.nurseUserId,
-                type: "job_assigned",
-                title: "Job assigned",
-                body: `${jobTitle} has been assigned to you.`,
-                entityType: "job",
-                entityId: body.jobId
-            },
-            ...rejectedNurseIds.map((nurseUserId) => ({
-                userId: nurseUserId,
-                type: "application_rejected",
-                title: "Application not selected",
-                body: `${jobTitle} was assigned to another nurse.`,
-                entityType: "job",
-                entityId: body.jobId
-            }))
-        ]);
-        await writeAdminAuditLog({
-            actor_id: authed.userId,
-            action: "job_assigned",
-            entity_type: "job",
-            entity_id: body.jobId,
-            metadata: { nurse_user_id: body.nurseUserId }
-        });
-        const sb = supabaseForUser(authed.jwt);
-        const { data: updatedJob } = await sb
-            .from("jobs")
-            .select("id,status,patient_user_id,title,description,address,start_time,hourly_rate,created_at")
-            .eq("id", body.jobId)
-            .single();
-        return reply.send({ job: updatedJob });
+    await registerAdminAssignmentRoute(app, {
+        requireAuth,
+        requireRole,
+        supabaseAdmin,
+        supabaseForUser,
+        isApprovedNurse,
+        markJobAssigned,
+        createNotifications,
+        writeAdminAuditLog
     });
 }

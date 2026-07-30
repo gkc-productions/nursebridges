@@ -6,8 +6,8 @@ This guide prepares the Expo mobile app for real device testing and basic intern
 
 - Expo config: `apps/mobile/app.config.ts`
 - EAS config: `apps/mobile/eas.json`
-- iOS bundle identifier: `com.nursebridge.mobile`
-- Android package: `com.nursebridge.mobile`
+- iOS bundle identifier: `com.nursebridges.mobile`
+- Android package: `com.nursebridges.mobile`
 - Internal Android profile: `preview` builds an APK
 - Production Android profile: `production` builds an AAB
 - Internal iOS profile: `preview` is configured for simulator builds

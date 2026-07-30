@@ -5,18 +5,36 @@ const easProjectId =
 export default {
   expo: {
     name: "NurseBridge",
-    slug: "nursebridge",
-    scheme: "nursebridge",
+    slug: "nursebridges",
+    scheme: "nursebridges",
     version: "0.1.0",
     orientation: "portrait",
+    icon: "./assets/icon.png",
     userInterfaceStyle: "light",
     plugins: ["expo-secure-store"],
+    splash: {
+      image: "./assets/splash.png",
+      resizeMode: "contain",
+      backgroundColor: "#EEF3F6"
+    },
     ios: {
-      bundleIdentifier: "com.nursebridge.mobile",
-      supportsTablet: false
+      bundleIdentifier: "com.nursebridges.mobile",
+      buildNumber: "1",
+      supportsTablet: false,
+      icon: "./assets/icon.png",
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
+        NSFaceIDUsageDescription:
+          "NurseBridge uses Face ID only when you choose to protect local app access on this device."
+      }
     },
     android: {
-      package: "com.nursebridge.mobile",
+      package: "com.nursebridges.mobile",
+      versionCode: 1,
+      adaptiveIcon: {
+        foregroundImage: "./assets/icon.png",
+        backgroundColor: "#101820"
+      },
       permissions: ["POST_NOTIFICATIONS"]
     },
     extra: {

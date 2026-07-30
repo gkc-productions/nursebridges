@@ -9,10 +9,11 @@
     "build": "tsc -p tsconfig.json",
     "lint": "echo \"(add eslint later)\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "echo \"(no tests)\""
+    "test": "node --import tsx --test test/validators.test.ts test/jobWorkflow.test.ts test/jobPayload.test.ts test/jobAssignment.test.ts test/jobTerminalCommand.test.ts test/adminAssignmentRoute.test.ts test/applicationDecisionRoute.test.ts test/jobApplyRoute.test.ts test/jobWithdrawRoute.test.ts test/jobCreateRoute.test.ts test/jobStatusCore.test.ts test/jobTerminalRoute.test.ts test/jobUpdateRoute.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^8.4.0",
+    "@nursebridge/shared": "workspace:*",
     "@supabase/supabase-js": "^2.93.1",
     "dotenv": "^17.2.3",
     "fastify": "^4.29.0",

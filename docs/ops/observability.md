@@ -28,6 +28,38 @@ API request logs include:
 
 Use `requestId` to correlate client failures with server logs.
 
+## Debug Create-Job Failures
+
+The active closed-beta blocker is Android `POST /jobs` returning `400`. Use the safe log watcher after reproducing the issue from the Android app:
+
+```sh
+scripts/ops/watch-create-job-logs.sh "15 minutes ago"
+```
+
+The watcher filters to create-job diagnostics and structured `POST /jobs` request events, so unrelated health checks should not appear.
+
+If the Android app shows a `Reference: mobile-...` value, filter directly to that request:
+
+```sh
+scripts/ops/watch-create-job-logs.sh "30 minutes ago" "mobile-example-request-id"
+```
+
+Relevant events:
+
+- `request_validation_failed`: request payload failed API validation before database insert.
+- `create_job_failed`: request passed validation but Supabase/database insert failed.
+- `request_completed`: confirms method, path, status code, and request ID.
+
+Expected workflow:
+
+1. Trigger one create-job attempt from the Android app.
+2. Copy the `Reference: mobile-...` value from the app error if it appears.
+3. Run the watcher immediately, passing that reference as the second argument when available.
+4. Capture the `requestId`, event name, issue path/message, or Supabase error code/message.
+5. Fix the exact validation, RLS, constraint, or schema issue shown in the log.
+
+Do not capture Authorization headers, bearer tokens, refresh tokens, Supabase keys, or raw request bodies.
+
 ## Test Health
 
 ```sh

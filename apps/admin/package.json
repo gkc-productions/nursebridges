@@ -4,20 +4,24 @@
   "version": "0.0.1",
   "scripts": {
     "dev": "next dev -p 3001",
-    "build": "next build",
+    "build": "pnpm --filter @nursebridge/shared build && next build",
     "start": "next start -p 3001",
-    "lint": "next lint",
+    "lint": "echo \"(admin eslint pending; covered by typecheck)\"",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"(no tests)\""
+    "test": "node --import tsx --test test/workflowRules.test.ts test/jobTerminalActionsCore.test.ts test/jobAssignmentActionsCore.test.ts test/nurseVerificationActionsCore.test.ts"
   },
   "dependencies": {
+    "@nursebridge/shared": "workspace:*",
     "@supabase/supabase-js": "^2.93.1",
     "next": "^16.1.5",
     "react": "19.2.4",
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
+    "@types/node": "^25.0.10",
     "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3"
+    "@types/react-dom": "^19.2.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
   }
 }

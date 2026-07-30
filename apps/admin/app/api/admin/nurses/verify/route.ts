@@ -1,9 +1,17 @@
 import { NextRequest } from "next/server";
-import { adminJson } from "../../../../../lib/requestId";
-import { writeAdminAuditLog } from "../../../../../lib/auditLog";
 import { requireAdmin } from "../../../../../lib/adminAuth";
+import { writeAdminAuditLog } from "../../../../../lib/auditLog";
 import { createNotification } from "../../../../../lib/notifications";
+import { createNurseVerificationActions } from "../../../../../lib/nurseVerificationActionsCore";
+import { adminJson } from "../../../../../lib/requestId";
 import { supabaseAdmin } from "../../../../../lib/supabaseAdmin";
+
+const actions = createNurseVerificationActions({
+  supabaseAdmin,
+  createNotification,
+  writeAdminAuditLog,
+  now: () => new Date().toISOString()
+});
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin(request);
@@ -17,56 +25,23 @@ export async function POST(request: NextRequest) {
     decision?: "approved" | "rejected";
     rejection_reason?: string;
   };
-  const status = body.decision ?? body.status;
-  if (status !== "approved" && status !== "rejected") {
+  const decision = body.decision ?? body.status;
+  if (decision !== "approved" && decision !== "rejected") {
     return adminJson(request, { error: "Invalid verification decision" }, { status: 400 });
   }
 
-  const { error } = await supabaseAdmin
-    .from("nurse_profiles")
-    .update({
-      verification_status: status,
-      verified_at: status === "approved" ? new Date().toISOString() : null,
-      is_active: status === "approved"
-    })
-    .eq("nurse_id", body.nurse_id);
+  try {
+    const result = await actions.decideNurseVerification({
+      nurseId: body.nurse_id,
+      actorId: auth.user.id,
+      decision,
+      rejectionReason: body.rejection_reason
+    });
 
-  if (error) {
-    return adminJson(request, { error: "Unable to update nurse verification" }, { status: 400 });
+    return adminJson(request, result);
+  } catch (error) {
+    const statusCode = typeof (error as any)?.statusCode === "number" ? (error as any).statusCode : 500;
+    const message = error instanceof Error ? error.message : "Unable to update nurse verification";
+    return adminJson(request, { error: message }, { status: statusCode });
   }
-
-  await supabaseAdmin
-    .from("nurse_verification_documents")
-    .update({
-      status,
-      reviewed_by: auth.user.id,
-      reviewed_at: new Date().toISOString(),
-      rejection_reason: status === "rejected" ? body.rejection_reason ?? null : null
-    })
-    .eq("nurse_user_id", body.nurse_id)
-    .eq("status", "pending");
-
-  await createNotification({
-    userId: body.nurse_id,
-    type: status === "approved" ? "nurse_verification_approved" : "nurse_verification_rejected",
-    title: status === "approved" ? "Verification approved" : "Verification rejected",
-    body:
-      status === "approved"
-        ? "Your nurse verification has been approved."
-        : body.rejection_reason
-          ? `Your nurse verification was rejected: ${body.rejection_reason}`
-          : "Your nurse verification was rejected.",
-    entityType: "nurse_profile",
-    entityId: body.nurse_id
-  });
-
-  await writeAdminAuditLog({
-    actor_id: auth.user.id,
-    action: "nurse_verification",
-    entity_type: "nurse_profile",
-    entity_id: body.nurse_id,
-    metadata: { status }
-  });
-
-  return adminJson(request, { ok: true });
 }

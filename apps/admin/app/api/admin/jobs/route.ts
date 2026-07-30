@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
   const { data: jobs, error } = await supabaseAdmin
     .from("jobs")
-    .select("id,status,patient_user_id,title,description,created_at")
+    .select("id,status,patient_user_id,title,description,address,start_time,hourly_rate,created_at")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -27,6 +27,10 @@ export async function GET(request: NextRequest) {
   }
 
   const jobIds = (jobs ?? []).map((job: JobRow) => job.id);
+  if (jobIds.length === 0) {
+    return adminJson(request, []);
+  }
+
   const { data: applications, error: applicationError } = await supabaseAdmin
     .from("applications")
     .select("job_id,nurse_user_id,status")
@@ -37,8 +41,12 @@ export async function GET(request: NextRequest) {
   }
 
   const acceptedNurseByJob = new Map<string, string>();
+  const applicantCountByJob = new Map<string, number>();
   for (const application of applications ?? []) {
     const row = application as ApplicationRow;
+    if (row.status === "applied" || row.status === "accepted") {
+      applicantCountByJob.set(row.job_id, (applicantCountByJob.get(row.job_id) ?? 0) + 1);
+    }
     if (row.status === "accepted" && !acceptedNurseByJob.has(row.job_id)) {
       acceptedNurseByJob.set(row.job_id, row.nurse_user_id);
     }
@@ -70,7 +78,11 @@ export async function GET(request: NextRequest) {
       status: job.status,
       title: job.title,
       description: job.description ?? null,
+      address: job.address ?? null,
+      start_time: job.start_time ?? null,
+      hourly_rate: job.hourly_rate ?? null,
       created_at: job.created_at,
+      applicant_count: applicantCountByJob.get(job.id) ?? 0,
       patient_name: patientProfile?.full_name ?? null,
       nurse_name: nurseProfile?.full_name ?? null
     };

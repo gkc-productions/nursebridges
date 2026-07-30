@@ -9,6 +9,9 @@ type JobDetail = {
   status: string;
   title: string;
   description: string | null;
+  address: string | null;
+  start_time: string | null;
+  hourly_rate: number | null;
   created_at: string;
   patient_name: string | null;
   nurse_name: string | null;
@@ -21,18 +24,33 @@ type EventRow = {
   actor_name: string | null;
 };
 
-type NurseRow = {
-  id: string;
-  profile_name: string | null;
-  verified: boolean;
+type ApplicationRow = {
+  job_id: string;
+  nurse_user_id: string;
+  nurse_name: string | null;
+  status: string;
+  verification_status: string;
+  created_at: string;
 };
+
+function formatDateTime(value: string | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString();
+}
+
+function formatRate(value: number | null) {
+  if (value === null || value === undefined) return "-";
+  return `$${value}/hr`;
+}
 
 export default function JobDetailPage() {
   const params = useParams();
   const jobId = params.id as string;
   const [job, setJob] = useState<JobDetail | null>(null);
   const [events, setEvents] = useState<EventRow[]>([]);
-  const [nurses, setNurses] = useState<NurseRow[]>([]);
+  const [applications, setApplications] = useState<ApplicationRow[]>([]);
   const [selectedNurse, setSelectedNurse] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
@@ -53,20 +71,17 @@ export default function JobDetailPage() {
     const data = await res.json();
     setJob(data.job as JobDetail);
     setEvents(data.events as EventRow[]);
-
-    const nurseRes = await adminFetch("/api/admin/nurses");
-
-    if (nurseRes.ok) {
-      const nurseData = (await nurseRes.json()) as NurseRow[];
-      setNurses(nurseData);
-    }
+    setApplications((data.applications ?? []) as ApplicationRow[]);
+    setSelectedNurse("");
   };
 
   useEffect(() => {
     void load();
   }, [jobId]);
 
-  const assignNurse = async () => {
+  const assignApplicant = async (nurseId: string) => {
+    setSelectedNurse(nurseId);
+
     const token = getAdminAccessToken();
     if (!token) {
       setError("Please sign in.");
@@ -75,7 +90,7 @@ export default function JobDetailPage() {
 
     const res = await adminFetch("/api/admin/jobs/assign", {
       method: "POST",
-      body: JSON.stringify({ job_id: jobId, nurse_id: selectedNurse })
+      body: JSON.stringify({ job_id: jobId, nurse_id: nurseId })
     });
 
     if (!res.ok) {
@@ -117,7 +132,10 @@ export default function JobDetailPage() {
             <p>Status: {job.status}</p>
             <p>Patient: {job.patient_name ?? "-"}</p>
             <p>Nurse: {job.nurse_name ?? "Unassigned"}</p>
-            <p>Created: {new Date(job.created_at).toLocaleString()}</p>
+            <p>Address: {job.address ?? "-"}</p>
+            <p>Start: {formatDateTime(job.start_time)}</p>
+            <p>Rate: {formatRate(job.hourly_rate)}</p>
+            <p>Created: {formatDateTime(job.created_at)}</p>
             <p>Description: {job.description ?? "-"}</p>
             <div className="actions">
               <button
@@ -137,22 +155,51 @@ export default function JobDetailPage() {
             </div>
           </div>
           <div>
-            <h3>Assign Nurse</h3>
-            <select
-              className="input"
-              value={selectedNurse}
-              onChange={(event) => setSelectedNurse(event.target.value)}
-            >
-              <option value="">Select nurse</option>
-              {nurses.map((nurse) => (
-                <option key={nurse.id} value={nurse.id}>
-                  {nurse.profile_name ?? nurse.id} {nurse.verified ? "(verified)" : ""}
-                </option>
-              ))}
-            </select>
-            <button className="button" onClick={assignNurse} disabled={!selectedNurse}>
-              Assign Nurse
-            </button>
+            <h3>Applicants</h3>
+            {applications.length === 0 ? (
+              <p>No nurse applications yet.</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nurse</th>
+                    <th>Application</th>
+                    <th>Verification</th>
+                    <th>Applied</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {applications.map((application) => {
+                    const canAssign =
+                      job.status === "open" &&
+                      application.status === "applied" &&
+                      application.verification_status === "approved";
+                    return (
+                      <tr key={application.nurse_user_id}>
+                        <td>{application.nurse_name ?? application.nurse_user_id}</td>
+                        <td>
+                          <span className="badge">{application.status}</span>
+                        </td>
+                        <td>
+                          <span className="badge">{application.verification_status}</span>
+                        </td>
+                        <td>{new Date(application.created_at).toLocaleString()}</td>
+                        <td>
+                          <button
+                            className="button"
+                            onClick={() => assignApplicant(application.nurse_user_id)}
+                            disabled={!canAssign || selectedNurse === application.nurse_user_id}
+                          >
+                            {application.status === "accepted" ? "Assigned" : "Assign"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
           <div>
             <h3>Status Timeline</h3>

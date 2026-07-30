@@ -2,11 +2,31 @@
   "name": "@nursebridge/shared",
   "version": "0.1.0",
   "private": true,
-  "main": "src/types.ts",
-  "types": "src/types.ts",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "react-native": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./workflow": {
+      "types": "./src/workflow.ts",
+      "react-native": "./src/workflow.ts",
+      "import": "./dist/workflow.js",
+      "default": "./dist/workflow.js"
+    }
+  },
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "lint": "echo \"(no lint)\"",
-    "typecheck": "echo \"(no typecheck)\"",
-    "test": "echo \"(no tests)\""
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "pnpm run build && node --import tsx --test test/workflow.test.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
   }
 }

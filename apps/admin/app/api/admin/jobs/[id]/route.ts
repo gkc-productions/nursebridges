@@ -1,48 +1,19 @@
 import { NextRequest } from "next/server";
 import { adminJson } from "../../../../../lib/requestId";
-import { writeAdminAuditLog } from "../../../../../lib/auditLog";
 import { requireAdmin } from "../../../../../lib/adminAuth";
-import { createNotifications } from "../../../../../lib/notifications";
+import { cancelJobAsAdmin, completeJobAsAdmin } from "../../../../../lib/jobTerminalActions";
 import { supabaseAdmin } from "../../../../../lib/supabaseAdmin";
 
 type ApplicationRow = {
   job_id: string;
   nurse_user_id: string;
   status: string;
+  created_at: string;
 };
 
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
-
-async function notifyJobStatus(
-  job: { id: string; title?: string | null; patient_user_id?: string | null },
-  status: "cancelled" | "completed",
-  nurseIds: string[]
-) {
-  const title = job.title || "Job";
-  const notificationTitle = status === "cancelled" ? "Job cancelled" : "Job completed";
-  const body = `${title} is now ${status}.`;
-
-  await createNotifications([
-    {
-      userId: job.patient_user_id,
-      type: `job_${status}`,
-      title: notificationTitle,
-      body,
-      entityType: "job",
-      entityId: job.id
-    },
-    ...Array.from(new Set(nurseIds)).map((nurseId) => ({
-      userId: nurseId,
-      type: `assigned_job_${status}`,
-      title: notificationTitle,
-      body,
-      entityType: "job",
-      entityId: job.id
-    }))
-  ]);
-}
 
 export async function GET(request: NextRequest, { params }: RouteContext) {
   const auth = await requireAdmin(request);
@@ -54,7 +25,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 
   const { data: job, error } = await supabaseAdmin
     .from("jobs")
-    .select("id,status,patient_user_id,title,description,created_at")
+    .select("id,status,patient_user_id,title,description,address,start_time,hourly_rate,created_at")
     .eq("id", id)
     .single();
 
@@ -77,16 +48,32 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   ) as ApplicationRow | undefined;
   const nurseId = acceptedApplication?.nurse_user_id ?? null;
 
+  const applicantIds = (applications ?? []).map((application) => application.nurse_user_id).filter(Boolean);
+  const profileIds = Array.from(new Set([job.patient_user_id, nurseId, ...applicantIds].filter(Boolean) as string[]));
+
   const { data: profiles, error: profileError } = await supabaseAdmin
     .from("profiles")
     .select("id,full_name")
-    .in("id", [job.patient_user_id, nurseId].filter(Boolean) as string[]);
+    .in("id", profileIds);
 
   if (profileError) {
     return adminJson(request, { error: "Unable to load job" }, { status: 400 });
   }
 
+  const { data: nurseProfiles, error: nurseProfileError } =
+    applicantIds.length > 0
+      ? await supabaseAdmin
+          .from("nurse_profiles")
+          .select("nurse_id,verification_status")
+          .in("nurse_id", applicantIds)
+      : { data: [], error: null };
+
+  if (nurseProfileError) {
+    return adminJson(request, { error: "Unable to load job" }, { status: 400 });
+  }
+
   const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+  const nurseProfileMap = new Map((nurseProfiles ?? []).map((profile) => [profile.nurse_id, profile]));
 
   return adminJson(request, {
     job: {
@@ -94,10 +81,26 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       status: job.status,
       title: job.title,
       description: job.description ?? null,
+      address: job.address ?? null,
+      start_time: job.start_time ?? null,
+      hourly_rate: job.hourly_rate ?? null,
       created_at: job.created_at,
       patient_name: profileMap.get(job.patient_user_id ?? "")?.full_name ?? null,
       nurse_name: nurseId ? profileMap.get(nurseId)?.full_name ?? null : null
     },
+    applications: (applications ?? []).map((application) => {
+      const row = application as ApplicationRow;
+      const profile = profileMap.get(row.nurse_user_id);
+      const nurseProfile = nurseProfileMap.get(row.nurse_user_id);
+      return {
+        job_id: row.job_id,
+        nurse_user_id: row.nurse_user_id,
+        nurse_name: profile?.full_name ?? null,
+        status: row.status,
+        verification_status: nurseProfile?.verification_status ?? "pending",
+        created_at: row.created_at
+      };
+    }),
     events: []
   });
 }
@@ -115,96 +118,16 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     return adminJson(request, { error: "Invalid job transition" }, { status: 400 });
   }
 
-  const { data: job, error: jobError } = await supabaseAdmin
-    .from("jobs")
-    .select("id,status,patient_user_id,title")
-    .eq("id", id)
-    .maybeSingle();
+  try {
+    const job =
+      nextStatus === "cancelled"
+        ? await cancelJobAsAdmin(id, auth.user.id)
+        : await completeJobAsAdmin(id, auth.user.id);
 
-  if (jobError) {
-    return adminJson(request, { error: "Unable to update job" }, { status: 400 });
+    return adminJson(request, { job });
+  } catch (error) {
+    const statusCode = typeof (error as any)?.statusCode === "number" ? (error as any).statusCode : 500;
+    const message = error instanceof Error ? error.message : "Unable to update job";
+    return adminJson(request, { error: message }, { status: statusCode });
   }
-  if (!job) {
-    return adminJson(request, { error: "not_found" }, { status: 404 });
-  }
-
-  const { data: applications, error: applicationsError } = await supabaseAdmin
-    .from("applications")
-    .select("nurse_user_id,status")
-    .eq("job_id", id);
-
-  if (applicationsError) {
-    return adminJson(request, { error: "Unable to update job" }, { status: 400 });
-  }
-
-  const acceptedNurseId =
-    (applications ?? []).find((application) => application.status === "accepted")?.nurse_user_id ?? null;
-
-  if (nextStatus === "cancelled") {
-    if (job.status !== "open" && job.status !== "assigned") {
-      return adminJson(request, { error: "Invalid job transition" }, { status: 400 });
-    }
-
-    const notifyNurseIds = (applications ?? [])
-      .filter((application) => application.status === "accepted" || application.status === "applied")
-      .map((application) => application.nurse_user_id as string);
-
-    const { error: rejectError } = await supabaseAdmin
-      .from("applications")
-      .update({ status: "rejected" })
-      .eq("job_id", id)
-      .eq("status", "applied");
-
-    if (rejectError) {
-      return adminJson(request, { error: "Unable to update job" }, { status: 400 });
-    }
-
-    const { data: updatedJob, error } = await supabaseAdmin
-      .from("jobs")
-      .update({ status: "cancelled" })
-      .eq("id", id)
-      .select("*")
-      .single();
-
-    if (error) {
-      return adminJson(request, { error: "Unable to update job" }, { status: 400 });
-    }
-
-    await notifyJobStatus(job, "cancelled", notifyNurseIds);
-    await writeAdminAuditLog({
-      actor_id: auth.user.id,
-      action: "job_cancelled",
-      entity_type: "job",
-      entity_id: id,
-      metadata: { previous_status: job.status }
-    });
-
-    return adminJson(request, { job: updatedJob });
-  }
-
-  if (job.status !== "assigned" || !acceptedNurseId) {
-    return adminJson(request, { error: "Invalid job transition" }, { status: 400 });
-  }
-
-  const { data: updatedJob, error } = await supabaseAdmin
-    .from("jobs")
-    .update({ status: "completed" })
-    .eq("id", id)
-    .select("*")
-    .single();
-
-  if (error) {
-    return adminJson(request, { error: "Unable to update job" }, { status: 400 });
-  }
-
-  await notifyJobStatus(job, "completed", [acceptedNurseId as string]);
-  await writeAdminAuditLog({
-    actor_id: auth.user.id,
-    action: "job_completed",
-    entity_type: "job",
-    entity_id: id,
-    metadata: { previous_status: job.status, nurse_user_id: acceptedNurseId }
-  });
-
-  return adminJson(request, { job: updatedJob });
 }

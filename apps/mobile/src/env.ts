@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import * as Device from "expo-device";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
+import { normalizeBaseUrl, shouldFallbackFromLocalhost } from "./envCore";
 
 export type EnvKey = "LOCAL" | "TUNNEL";
 
@@ -33,19 +34,6 @@ export const envOptions: EnvOption[] = [
   }
 ];
 
-function normalizeBaseUrl(url: string) {
-  return url.trim().replace(/\/$/, "");
-}
-
-function isLocalhostBaseUrl(url: string) {
-  try {
-    const { hostname } = new URL(url);
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
-  } catch {
-    return /(^https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(url);
-  }
-}
-
 function getDefaultEnvOption() {
   return envOptions.find((opt) => opt.key === DEFAULT_ENV_KEY) ?? envOptions[0];
 }
@@ -61,7 +49,7 @@ export async function loadApiConfig(): Promise<{ envKey: EnvKey; baseUrl: string
   let envBase = envOptions.find((opt) => opt.key === envKey)?.baseUrl ?? defaultOption.baseUrl;
   let baseUrl = normalizeBaseUrl(storedBaseUrl ?? envBase);
 
-  if (Platform.OS === "android" && Device.isDevice && isLocalhostBaseUrl(baseUrl)) {
+  if (shouldFallbackFromLocalhost({ platform: Platform.OS, isDevice: Device.isDevice, baseUrl })) {
     envKey = defaultOption.key;
     envBase = defaultOption.baseUrl;
     baseUrl = normalizeBaseUrl(envBase);

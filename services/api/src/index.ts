@@ -72,17 +72,31 @@ async function main() {
   // Error handler (consistent responses)
   app.setErrorHandler((err: any, req, reply) => {
     const isValidationError = err instanceof ZodError;
+    const path = req.url.split("?")[0];
     const statusCode = isValidationError
       ? 400
       : err?.statusCode && Number.isInteger(err.statusCode)
         ? err.statusCode
         : 500;
+    if (isValidationError) {
+      req.log.warn({
+        event: "request_validation_failed",
+        requestId: req.id,
+        method: req.method,
+        path,
+        statusCode,
+        issues: err.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message
+        }))
+      });
+    }
     if (statusCode >= 500) {
       req.log.error({
         event: "request_error",
         requestId: req.id,
         method: req.method,
-        path: req.url.split("?")[0],
+        path,
         statusCode,
         err
       });
