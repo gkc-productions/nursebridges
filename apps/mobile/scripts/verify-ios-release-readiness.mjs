@@ -75,7 +75,7 @@ assertIncludes(infoPlist, "NurseBridge uses Face ID only", "Info.plist");
 assertIncludes(project, "MARKETING_VERSION = 0.1.0;", "project.pbxproj");
 assertIncludes(project, "CURRENT_PROJECT_VERSION = 1;", "project.pbxproj");
 assertIncludes(project, "REACT_NATIVE_XCODE_SCRIPT", "project.pbxproj");
-assertIncludes(project, "BUNDLE_COMMAND=\"export:embed\"", "project.pbxproj");
+assertIncludes(project, 'BUNDLE_COMMAND=\\"export:embed\\"', "project.pbxproj");
 assert(!project.includes("export SKIP_BUNDLING=1"), "physical iPhone Debug builds must not force SKIP_BUNDLING=1");
 
 const sourceFiles = fs
