@@ -37,6 +37,7 @@ import {
   buildNurseRequestDetailModel,
   buildNurseWorkflowSnapshot,
   buildPatientWorkflowSnapshot,
+  buildWorkflowEvidenceSummary,
   buildCreateCareRequestPayload,
   buildPatientRequestDetailModel,
   buildVerificationStoragePath,
@@ -144,6 +145,31 @@ function WorkflowSnapshotPanel({ snapshot }: { snapshot: { status: string; nextS
       <SnapshotRow label="Status" value={snapshot.status} />
       <SnapshotRow label="Next" value={snapshot.nextStep} />
       <SnapshotRow label="Record" value={snapshot.record} />
+    </View>
+  );
+}
+
+function WorkflowEvidencePanel({
+  rows,
+  onCopy
+}: {
+  rows: Array<{ label: string; value: string }>;
+  onCopy: () => void;
+}) {
+  return (
+    <View style={styles.evidencePanel}>
+      <View style={styles.rowBetween}>
+        <Text style={styles.evidenceTitle}>Support snapshot</Text>
+        <TouchableOpacity style={styles.evidenceCopyButton} onPress={onCopy}>
+          <Text style={styles.evidenceCopyText}>Copy</Text>
+        </TouchableOpacity>
+      </View>
+      {rows.map((row) => (
+        <View key={row.label} style={styles.evidenceRow}>
+          <Text style={styles.evidenceLabel}>{row.label}</Text>
+          <Text style={styles.evidenceValue}>{row.value}</Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -397,8 +423,7 @@ function AccountPanel({
       <View style={styles.supportPanel}>
         <Text style={styles.supportTitle}>Support note</Text>
         <Text style={styles.emptyText}>
-          For app issues, copy the issue details when an error appears and send them to the beta operator. For urgent
-          medical or safety needs, use local emergency services or the patient's normal care contact.
+          For app issues, copy the issue details when an error appears and send them to the beta operator. For urgent medical or safety needs, use local emergency services or the patient's normal care contact.
         </Text>
       </View>
       <TouchableOpacity style={styles.smallButton} onPress={onSignOut} disabled={actionLoading}>
@@ -711,6 +736,27 @@ export default function App() {
     nurseJobs.length,
     patientJobs.length,
     pendingApplications,
+    role,
+    unreadNotificationCount
+  ]);
+  const workflowEvidence = useMemo(() => {
+    const focusJob = role === "patient" ? patientFocusJob : role === "nurse" ? nurseFocusJob : null;
+    const totalRecords = role === "patient" ? patientJobs.length : role === "nurse" ? nurseJobs.length : 0;
+
+    return buildWorkflowEvidenceSummary({
+      role,
+      apiConfigured: Boolean(baseUrl),
+      focusedRequestId: focusJob?.id,
+      focusedRequestStatus: focusJob?.status,
+      totalRecords,
+      unreadNotifications: unreadNotificationCount
+    });
+  }, [
+    baseUrl,
+    nurseFocusJob,
+    nurseJobs.length,
+    patientFocusJob,
+    patientJobs.length,
     role,
     unreadNotificationCount
   ]);
@@ -1169,6 +1215,11 @@ export default function App() {
     setNotice("Issue details copied.");
   }
 
+  async function copyWorkflowEvidence() {
+    await Clipboard.setStringAsync(workflowEvidence.copyText);
+    setNotice("Support snapshot copied.");
+  }
+
   function confirmJobTransition(job: JobRow, action: "cancel" | "complete") {
     const confirmation = buildCareRequestTransitionConfirmation(action);
     Alert.alert(
@@ -1222,6 +1273,7 @@ export default function App() {
           <Text style={styles.title}>{getRoleHeadline(role)}</Text>
           <Text style={styles.subTitle}>{getRoleSubhead(role)}</Text>
           <WorkflowSnapshotPanel snapshot={workflowSnapshot} />
+          <WorkflowEvidencePanel rows={workflowEvidence.rows} onCopy={copyWorkflowEvidence} />
           <View style={styles.metricsGrid}>
             {dashboardMetrics.map((metric) => (
               <MetricTile key={metric.label} label={metric.label} value={metric.value} />
@@ -1451,7 +1503,7 @@ export default function App() {
                   <View style={styles.card}>
                     <SectionHeader eyebrow="Patient workflow" title="Request care support" />
                     <Text style={styles.sectionIntro}>
-                      Capture the care need clearly enough for review, assignment, and follow-up.
+                      Submit only the details needed for closed-beta review, assignment, and follow-up. This is not an emergency service or a full medical chart.
                     </Text>
                     <Text style={styles.inputLabel}>Support type or request title *</Text>
                     <TextInput
@@ -1681,7 +1733,8 @@ export default function App() {
                   disabled={screenLoading || actionLoading}
                 />
                 <Text style={styles.emptyText}>
-                  Upload requested documents for admin review. This beta does not claim background-check or license-verification completion.
+                  Upload requested documents for admin review after you are comfortable sharing them for beta
+                  verification. Approval is not automatic, and this beta does not claim background-check or license-verification completion.
                 </Text>
                 <TextInput
                   style={styles.input}
@@ -1875,6 +1928,55 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     marginBottom: 14
+  },
+  evidencePanel: {
+    backgroundColor: "#102030",
+    borderColor: "#334657",
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 14,
+    padding: 12
+  },
+  evidenceTitle: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
+    marginBottom: 8
+  },
+  evidenceCopyButton: {
+    backgroundColor: "#E8EEF5",
+    borderRadius: 6,
+    minHeight: 30,
+    paddingHorizontal: 10,
+    paddingVertical: 6
+  },
+  evidenceCopyText: {
+    color: colors.ink,
+    fontSize: 11,
+    fontWeight: "900"
+  },
+  evidenceRow: {
+    borderTopColor: "#24384A",
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+    paddingVertical: 7
+  },
+  evidenceLabel: {
+    color: "#AFC0CC",
+    flex: 0.9,
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase"
+  },
+  evidenceValue: {
+    color: "#FFFFFF",
+    flex: 1.5,
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 16,
+    textAlign: "right"
   },
   snapshotRow: {
     borderBottomColor: "#2B3D4D",

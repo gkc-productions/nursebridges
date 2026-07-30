@@ -1,34 +1,20 @@
-import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import * as Clipboard from "expo-clipboard";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
 
 type Props = {
   accessToken: string | null;
 };
 
 export default function TokenScreen({ accessToken }: Props) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    if (!accessToken) return;
-    await Clipboard.setStringAsync(accessToken);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
+  const signedIn = Boolean(accessToken);
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Access Token</Text>
-      <Text selectable style={styles.tokenText}>
-        {accessToken ?? "No active session"}
+      <Text style={styles.title}>Session Status</Text>
+      <Text style={styles.sessionText}>{signedIn ? "Signed in" : "No active session"}</Text>
+      <Text style={styles.helpText}>
+        Session credentials are intentionally hidden. Use issue details or the support snapshot for debugging.
       </Text>
-      <TouchableOpacity
-        style={[styles.button, !accessToken && styles.buttonDisabled]}
-        onPress={handleCopy}
-        disabled={!accessToken}
-      >
-        <Text style={styles.buttonText}>{copied ? "Copied" : "Copy Token"}</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -44,22 +30,14 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 12
   },
-  tokenText: {
+  sessionText: {
     fontSize: 12,
     color: "#2D2A26",
     marginBottom: 14
   },
-  button: {
-    backgroundColor: "#1E6A5A",
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: "center"
-  },
-  buttonDisabled: {
-    backgroundColor: "#9FB4AE"
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontWeight: "600"
+  helpText: {
+    color: "#5E564F",
+    fontSize: 12,
+    lineHeight: 17
   }
 });

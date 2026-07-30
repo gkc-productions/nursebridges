@@ -3,23 +3,15 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "rea
 
 type Props = {
   baseUrl: string;
-  accessToken: string | null;
 };
 
-export default function ApiTestScreen({ baseUrl, accessToken }: Props) {
+export default function ApiTestScreen({ baseUrl }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<string | null>(null);
   const [status, setStatus] = useState<number | null>(null);
 
   const handleTest = async () => {
-    if (!accessToken) {
-      setError("Sign in to test the API.");
-      setResponse(null);
-      setStatus(null);
-      return;
-    }
-
     setLoading(true);
     setError(null);
     setResponse(null);
@@ -27,10 +19,7 @@ export default function ApiTestScreen({ baseUrl, accessToken }: Props) {
 
     try {
       const res = await fetch(`${baseUrl}/health`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
+        method: "GET"
       });
 
       const text = await res.text();

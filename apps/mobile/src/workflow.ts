@@ -100,6 +100,11 @@ export type WorkflowSnapshot = {
   record: string;
 };
 
+export type WorkflowEvidenceSummary = {
+  rows: Array<{ label: string; value: string }>;
+  copyText: string;
+};
+
 export type PatientRequestDetailModel = {
   title: string;
   status: string;
@@ -240,6 +245,32 @@ export function buildNurseWorkflowSnapshot(input: {
     status: "Approved to work",
     nextStep: "Refresh before scheduled beta tests",
     record: "No open requests right now"
+  };
+}
+
+export function buildWorkflowEvidenceSummary(input: {
+  role: "patient" | "nurse" | "admin" | null;
+  apiConfigured: boolean;
+  focusedRequestId?: string | null;
+  focusedRequestStatus?: string | null;
+  totalRecords: number;
+  unreadNotifications: number;
+}): WorkflowEvidenceSummary {
+  const role = input.role ?? "signed out";
+  const requestId = input.focusedRequestId ?? "none";
+  const status = input.focusedRequestStatus ? careRequestStatusLabel(input.focusedRequestStatus) : "No focused request";
+  const rows = [
+    { label: "Role", value: role },
+    { label: "API", value: input.apiConfigured ? "Connected" : "Not configured" },
+    { label: "Request ID", value: requestId },
+    { label: "Status", value: status },
+    { label: "Records", value: String(input.totalRecords) },
+    { label: "Unread updates", value: String(input.unreadNotifications) }
+  ];
+
+  return {
+    rows,
+    copyText: rows.map((row) => `${row.label}: ${row.value}`).join("\n")
   };
 }
 

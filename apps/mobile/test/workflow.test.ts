@@ -5,6 +5,7 @@ import {
   buildNurseRequestDetailModel,
   buildNurseWorkflowSnapshot,
   buildPatientWorkflowSnapshot,
+  buildWorkflowEvidenceSummary,
   buildPatientRequestDetailModel,
   buildCreateCareRequestPayload,
   buildCareRequestTransitionConfirmation,
@@ -219,6 +220,28 @@ describe("mobile workflow helpers", () => {
         record: "2 available requests"
       }
     );
+  });
+
+  it("builds a copyable support snapshot without care details", () => {
+    const summary = buildWorkflowEvidenceSummary({
+      role: "patient",
+      apiConfigured: true,
+      focusedRequestId: "job-123",
+      focusedRequestStatus: "assigned",
+      totalRecords: 2,
+      unreadNotifications: 1
+    });
+
+    assert.deepEqual(summary.rows, [
+      { label: "Role", value: "patient" },
+      { label: "API", value: "Connected" },
+      { label: "Request ID", value: "job-123" },
+      { label: "Status", value: "Assigned" },
+      { label: "Records", value: "2" },
+      { label: "Unread updates", value: "1" }
+    ]);
+    assert.match(summary.copyText, /Request ID: job-123/);
+    assert.doesNotMatch(summary.copyText, /appointment|mobility|address|description/i);
   });
 
   it("builds a patient request detail model with status, timeline, updates, and actions", () => {
