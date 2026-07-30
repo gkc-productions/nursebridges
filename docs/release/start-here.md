@@ -12,7 +12,7 @@ This is the navigation index for the current NurseBridge production-track planni
 - The Expo Go/LAN iPhone path was attempted and abandoned. The next device path is a signed installed iOS build/TestFlight path or recovered Android access.
 - Canonical mobile build identity is `nursebridges` with the `s`: iOS bundle id and Android package `com.nursebridges.mobile`.
 - Local iOS Release compile succeeds with signing disabled and validates `com.nursebridges.mobile`.
-- Signed iPhone install is blocked by Apple account/provisioning: Xcode still needs an authenticated team `R2N3CHKSBB` account and a development profile for `com.nursebridges.mobile`.
+- Signed iPhone install requires the authenticated Apple Developer Program team `HKQJ75SQVF` and a development profile for `com.nursebridges.mobile`.
 - Do not touch Pathfinder.
 - Do not run Twin.
 - Do not run EAS, production smoke, Cloudflare changes, Supabase schema/env/secrets changes, or live production job creation without explicit approval.

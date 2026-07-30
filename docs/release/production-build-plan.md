@@ -100,7 +100,7 @@ Engineering focus:
 
 | Risk | Current posture | Mitigation |
 | --- | --- | --- |
-| Apple signing blocks installed iOS proof | Active blocker | Use `com.nursebridges.mobile`, sign into team `R2N3CHKSBB`, create/download matching development profile, keep unsigned Xcode builds green. |
+| Apple signing blocks installed iOS proof | Active blocker | Use `com.nursebridges.mobile`, sign into team `HKQJ75SQVF`, create/download matching development profile, keep unsigned Xcode builds green. |
 | Workflow looks proven only in tests | Active risk | Require installed-device evidence for create/apply/assign/complete/cancel before beta claims. |
 | API/admin lifecycle drift creates unsafe states | Known technical debt | Use `docs/architecture/workflow-source-of-truth.md`; converge assignment/cancel/complete on RPC-backed finalizer contracts before outside beta unless the owner signs a written exception. |
 | Supabase schema drift breaks runtime behavior | Known technical debt | Verify `docs/architecture/data-contract.md` against production; keep DB contract checks. |
@@ -122,7 +122,7 @@ Status:
 - API/admin runtime health was verified before access was blocked.
 - Backend create-job payload fix is deployed, but real-device create-request proof after the fix is still missing.
 - Local iOS Release compile succeeds with signing disabled and validates `com.nursebridges.mobile`.
-- Signed iPhone install is blocked by Apple account/provisioning: Xcode still has no authenticated account for team `R2N3CHKSBB` and no development profile for `com.nursebridges.mobile`.
+- Signed iPhone builds require an authenticated account for team `HKQJ75SQVF` and a development profile for `com.nursebridges.mobile`.
 
 Actions:
 

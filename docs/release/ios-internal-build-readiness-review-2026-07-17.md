@@ -89,7 +89,7 @@ production:
 - Local Xcode compile for `NurseBridge.xcworkspace` succeeds for iPhone OS with signing disabled.
 - A paired physical iPhone is visible to Xcode: `kossivi’s iPhone`, iPhone 16 Pro Max, device id `00008140-001904160C0B001C`.
 - A valid local Apple Development certificate exists for `Kossivi Gbleguede`.
-- Signed device build is blocked because Xcode has no authenticated account for team `R2N3CHKSBB` and no development provisioning profile for `com.nursebridges.mobile`.
+- Signed device builds require the active Apple Developer Program team `HKQJ75SQVF` and a matching development provisioning profile for `com.nursebridges.mobile`.
 - App icon and splash assets now exist at `apps/mobile/assets/icon.png` and `apps/mobile/assets/splash.png`; the iOS asset catalog icon has been replaced from the blank generated icon.
 - TestFlight access is not confirmed in this review.
 - Push notification delivery is not proven and should not block in-app status proof unless push is part of the beta promise.
@@ -184,7 +184,7 @@ Owner action needed:
 
 1. In Xcode, open `Xcode` -> `Settings...` -> `Accounts`.
 2. Sign in with the Apple Developer Apple ID.
-3. Confirm team `R2N3CHKSBB` appears and is valid.
+3. Confirm team `HKQJ75SQVF` appears and is valid.
 4. In Apple Developer, confirm bundle id `com.nursebridges.mobile` exists or create it.
 5. In App Store Connect, confirm/create the NurseBridge app record using bundle id `com.nursebridges.mobile`.
 6. Tell Codex when complete so the signed local iPhone build can be retried.
@@ -209,7 +209,7 @@ Use `docs/ops/mobile-beta-build-readiness.md` for the approval template.
 Do not add more build profiles yet. The next useful step is to resolve Apple signing/provisioning:
 
 - Sign into the Apple Developer account in Xcode.
-- Confirm team `R2N3CHKSBB` is the right team for NurseBridge.
+- Confirm team `HKQJ75SQVF` is available for NurseBridge.
 - Confirm `com.nursebridges.mobile` is the final beta bundle identifier.
 - Let Xcode or EAS create/download the matching development and distribution profiles only after explicit approval for that credential behavior.
 

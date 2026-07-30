@@ -233,7 +233,7 @@ Rationale:
 Consequences:
 
 - All build readiness docs and app config must use `com.nursebridges.mobile`.
-- Signed iOS install remains blocked until Xcode can see team `R2N3CHKSBB` and a matching provisioning profile for `com.nursebridges.mobile`.
+- Signed iOS install requires Xcode access to team `HKQJ75SQVF` and a matching provisioning profile for `com.nursebridges.mobile`.
 - Any future public brand rename needs a deliberate release/versioning decision instead of casual search-and-replace.
 
 Revisit if:

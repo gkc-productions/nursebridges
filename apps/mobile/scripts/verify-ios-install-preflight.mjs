@@ -68,7 +68,7 @@ requireCheck(appConfig.includes('scheme: "nursebridges"'), "Expo scheme is nurse
 requireCheck(appConfig.includes(`bundleIdentifier: "${bundleId}"`), `iOS bundle identifier is ${bundleId}`);
 requireCheck(appConfig.includes(`package: "${bundleId}"`), `Android package is ${bundleId}`);
 requireCheck(projectFile.includes(`PRODUCT_BUNDLE_IDENTIFIER = ${bundleId};`), `Xcode project file uses ${bundleId}`);
-requireCheck(projectFile.includes("DEVELOPMENT_TEAM = R2N3CHKSBB;"), "Xcode project file uses DEVELOPMENT_TEAM = R2N3CHKSBB");
+requireCheck(projectFile.includes("DEVELOPMENT_TEAM = HKQJ75SQVF;"), "Xcode project file uses DEVELOPMENT_TEAM = HKQJ75SQVF");
 
 section("Xcode");
 const xcodeVersion = run("xcodebuild", ["-version"]).trim();
@@ -98,10 +98,10 @@ if (exists(workspace)) {
     warn("xcodebuild did not return readable build settings in this shell; project file identity checks above are authoritative for this preflight");
   }
 
-  if (settings.includes("DEVELOPMENT_TEAM = R2N3CHKSBB")) {
-    pass("Xcode build settings report DEVELOPMENT_TEAM = R2N3CHKSBB");
+  if (settings.includes("DEVELOPMENT_TEAM = HKQJ75SQVF")) {
+    pass("Xcode build settings report DEVELOPMENT_TEAM = HKQJ75SQVF");
   } else {
-    warn("xcodebuild did not report DEVELOPMENT_TEAM = R2N3CHKSBB in this shell");
+    warn("xcodebuild did not report DEVELOPMENT_TEAM = HKQJ75SQVF in this shell");
   }
 }
 
@@ -122,15 +122,22 @@ const validIdentityMatch = identities.match(/(\d+) valid identities found/);
 const validIdentityCount = validIdentityMatch ? Number(validIdentityMatch[1]) : 0;
 requireCheck(validIdentityCount > 0, "At least one valid code-signing identity is installed");
 
-const profileDir = path.join(os.homedir(), "Library/MobileDevice/Provisioning Profiles");
-const profileFiles = fs.existsSync(profileDir)
-  ? fs.readdirSync(profileDir).filter((name) => name.endsWith(".mobileprovision"))
-  : [];
+const profileDirs = [
+  path.join(os.homedir(), "Library/MobileDevice/Provisioning Profiles"),
+  path.join(os.homedir(), "Library/Developer/Xcode/UserData/Provisioning Profiles")
+];
+const profileFiles = profileDirs.flatMap((profileDir) =>
+  fs.existsSync(profileDir)
+    ? fs
+        .readdirSync(profileDir)
+        .filter((name) => name.endsWith(".mobileprovision") || name.endsWith(".provisionprofile"))
+        .map((name) => path.join(profileDir, name))
+    : []
+);
 
 let matchingProfiles = 0;
-for (const profile of profileFiles) {
-  const fullPath = path.join(profileDir, profile);
-  const decoded = run("security", ["cms", "-D", "-i", fullPath]);
+for (const profilePath of profileFiles) {
+  const decoded = run("security", ["cms", "-D", "-i", profilePath]);
   if (decoded.includes(bundleId)) matchingProfiles += 1;
 }
 

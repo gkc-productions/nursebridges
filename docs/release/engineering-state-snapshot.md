@@ -47,7 +47,7 @@ The backend create-job payload fix is deployed. API diagnostics remain in place,
 
 The blocker is now real-device evidence capture, not lack of backend instrumentation or known payload fix.
 
-The immediate iOS installed-build blocker is Apple signing/provisioning, not compilation. Local iOS Release compile succeeds with signing disabled and validates `com.nursebridges.mobile`; signed iPhone install still fails because Xcode has no authenticated account for team `R2N3CHKSBB` and no development provisioning profile for `com.nursebridges.mobile`.
+The immediate iOS installed-build dependency is Apple signing/provisioning, not compilation. Local iOS Release compile succeeds with signing disabled and validates `com.nursebridges.mobile`; signed iPhone builds use team `HKQJ75SQVF` and require a matching development provisioning profile.
 
 ## What Is Already Hardened
 

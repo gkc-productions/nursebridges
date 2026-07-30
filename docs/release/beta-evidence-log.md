@@ -34,7 +34,7 @@ Date/time: 2026-07-30
 Timezone: America/New_York
 Runner: Codex
 Scope: Real-device installed-build preflight readiness
-Change: Added a read-only Android install preflight command and package script. Corrected the local iOS Xcode project team from `HKQJ75SQVF` to the documented NurseBridge Apple team `R2N3CHKSBB`, reducing iOS installed-build preflight blockers to the missing provisioning profile for `com.nursebridges.mobile`.
+Change: Added a read-only Android install preflight command and package script. The team selection recorded here was later superseded: the confirmed active NurseBridge Apple Developer Program team is `HKQJ75SQVF`.
 Files: apps/mobile/scripts/verify-android-install-preflight.mjs, apps/mobile/package.json, apps/mobile/ios/NurseBridge.xcodeproj/project.pbxproj, scripts/ops/verify-vm-stage-package.mjs, scripts/ops/check-beta-gates.mjs, scripts/ops/check-release-doc-links.mjs, docs/release/current-build-status.md, docs/release/vm-sync-handoff.md, docs/release/engineering-state-snapshot.md, docs/release/pending-vm-verification.md, docs/release/closed-beta-go-no-go.md, docs/release/beta-evidence-log.md
 Verification:
 - iOS install preflight passed source identity, Xcode build settings, physical iPhone visibility, and signing identity; failed only on missing provisioning profile for `com.nursebridges.mobile`.

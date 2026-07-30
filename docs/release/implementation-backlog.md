@@ -69,7 +69,7 @@ Work:
 - Use `docs/ops/mobile-beta-build-readiness.md` and `docs/release/ios-internal-build-readiness-review-2026-07-17.md` before any iOS build request.
 - Do not run EAS, TestFlight, app-store-connected actions, or credential changes without explicit owner approval.
 - Resolve the current iOS signing blocker for `com.nursebridges.mobile`:
-  - Xcode must show an authenticated account for team `R2N3CHKSBB`.
+  - Xcode must show an authenticated account for team `HKQJ75SQVF`.
   - Apple Developer/App Store Connect must have or select the matching app identifier.
   - Xcode must be able to create/download a development provisioning profile for the connected iPhone.
 - Use `docs/release/android-create-job-capture-packet.md` if Android access is recovered.
