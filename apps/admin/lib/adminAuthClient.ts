@@ -7,11 +7,13 @@ const TOKEN_KEY = "nursebridge_admin_access_token";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY env vars.");
-}
+function getSupabaseClient() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY env vars.");
+  }
 
-export const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+  return createClient(supabaseUrl, supabaseAnonKey);
+}
 
 function cleanToken(token: string) {
   return token.trim().replace(/^"|"$/g, "");
@@ -32,7 +34,7 @@ export function getAdminAccessToken(): string | null {
 
 export async function signOutAdmin() {
   setAdminAccessToken(null);
-  await supabaseClient.auth.signOut();
+  await getSupabaseClient().auth.signOut();
 }
 
 export async function adminFetch(path: string, init: RequestInit = {}) {
@@ -60,7 +62,7 @@ export async function adminFetch(path: string, init: RequestInit = {}) {
 }
 
 export async function signInWithPassword(email: string, password: string) {
-  const res = await supabaseClient.auth.signInWithPassword({ email, password });
+  const res = await getSupabaseClient().auth.signInWithPassword({ email, password });
   setAdminAccessToken(res.data.session?.access_token ?? null);
   return res;
 }
