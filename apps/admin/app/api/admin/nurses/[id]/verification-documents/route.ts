@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
   const { data, error } = await supabaseAdmin
     .from("nurse_verification_documents")
-    .select("id,nurse_user_id,storage_bucket,storage_path,document_type,status,reviewed_by,reviewed_at,rejection_reason,created_at")
+    .select("id,nurse_user_id,document_type,status,reviewed_at,rejection_reason,created_at")
     .eq("nurse_user_id", id)
     .order("created_at", { ascending: false });
 

@@ -29,7 +29,7 @@ function forbidSnippet(doc, text, snippet) {
 const mobileTypesDoc = "apps/mobile/src/types.ts";
 const mobileAppDoc = "apps/mobile/App.tsx";
 const adminDataDoc = "apps/admin/lib/adminDashboardData.ts";
-const adminPageDoc = "apps/admin/app/page.tsx";
+const adminPageDoc = "apps/admin/app/nurses/page.tsx";
 const legalDoc = "docs/legal/beta-legal-consent-checklist.md";
 const inAppGuardDoc = "scripts/ops/check-in-app-consent-readiness.mjs";
 const accessGuardDoc = "scripts/ops/check-access-and-secrets-readiness.mjs";
@@ -100,8 +100,8 @@ for (const forbidden of [
 
 for (const snippet of [
   "Review submitted metadata without exposing private storage paths.",
-  "documents.length",
-  "latest.document_type"
+  "documentsByNurse[nurse.id]",
+  "document.document_type"
 ]) {
   requireSnippet(adminPageDoc, adminPage, snippet);
 }

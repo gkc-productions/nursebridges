@@ -48,7 +48,7 @@ export async function adminFetch(path: string, init: RequestInit = {}) {
   const res = await fetch(path, { ...init, headers });
 
   if (res.status >= 400) {
-    console.error("Admin request failed", { path, status: res.status });
+    console.error("Admin API call failed", { path, status: res.status });
   }
 
   if (res.status === 401 || res.status === 403) {

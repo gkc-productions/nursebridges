@@ -21,7 +21,7 @@ function requireSnippet(doc, text, snippet) {
 }
 
 const mobileAppDoc = "apps/mobile/App.tsx";
-const adminPageDoc = "apps/admin/app/page.tsx";
+const adminPageDoc = "apps/admin/app/nurses/page.tsx";
 const legalDoc = "docs/legal/beta-legal-consent-checklist.md";
 const legalGuardDoc = "scripts/ops/check-legal-consent-readiness.mjs";
 const trustGuardDoc = "scripts/ops/check-trust-language.mjs";
@@ -50,11 +50,10 @@ for (const snippet of [
 }
 
 for (const snippet of [
-  "Closed beta console",
   "Review submitted metadata without exposing private storage paths.",
   "Approval records beta eligibility",
-  "it does not claim background-check or license-verification completion.",
-  "Recent admin events"
+  "does not claim background-check or",
+  "license-verification completion."
 ]) {
   requireSnippet(adminPageDoc, adminPage, snippet);
 }

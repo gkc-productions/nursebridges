@@ -44,7 +44,7 @@ export async function sendExpoPushToUser(input: {
 
   if (error) {
     if (!isMissingPushTokensTable(error)) {
-      console.error("push token lookup failed", { user_id: input.userId, code: (error as any).code });
+      console.error("push destination lookup failed", { user_id: input.userId, code: (error as any).code });
     }
     return;
   }
@@ -79,7 +79,7 @@ export async function sendExpoPushToUser(input: {
 
       const text = await res.text();
       if (!res.ok) {
-        console.error("expo push send failed", { status: res.status, body: text.slice(0, 500) });
+        console.error("expo push send failed", { status: res.status });
         continue;
       }
 

@@ -40,7 +40,6 @@ export type NotificationRow = {
 
 export type VerificationDocumentRow = {
   id: string;
-  storage_path: string;
   document_type: string;
   status: string;
   reviewed_at: string | null;

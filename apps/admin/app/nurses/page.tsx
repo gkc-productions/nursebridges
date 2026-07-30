@@ -16,7 +16,6 @@ type NurseRow = {
 
 type VerificationDocument = {
   id: string;
-  storage_path: string;
   document_type: string;
   status: string;
   reviewed_at: string | null;
@@ -84,6 +83,10 @@ export default function NursesPage() {
   return (
     <section>
       <h2>Nurse Verification</h2>
+      <p>
+        Review submitted metadata without exposing private storage paths. Approval records beta eligibility only; it
+        does not claim background-check or license-verification completion.
+      </p>
       {error ? <p className="notice">{error}</p> : null}
       <table>
         <thead>
@@ -105,8 +108,8 @@ export default function NursesPage() {
                 {(documentsByNurse[nurse.id] ?? []).length === 0
                   ? "-"
                   : documentsByNurse[nurse.id].map((document) => (
-                      <div key={document.id}>
-                        {document.document_type}: {document.storage_path} ({document.status})
+                    <div key={document.id}>
+                        {document.document_type} ({document.status})
                       </div>
                     ))}
               </td>

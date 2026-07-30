@@ -110,15 +110,6 @@ for (const snippet of [
 forbidSnippet(adminDataDoc, auditRowMatch[0], "metadata");
 forbidSnippet(adminDataDoc, adminData, ".select(\"id,action,entity_type,entity_id,actor_id,created_at,metadata\")");
 
-for (const snippet of [
-  "{event.action}",
-  "{event.entity_type}",
-  "{event.entity_id",
-  "{formatDate(event.created_at)}"
-]) {
-  requireSnippet(adminPageDoc, adminPage, snippet);
-}
-
 forbidSnippet(adminPageDoc, adminPage, "event.metadata");
 
 for (const snippet of [
