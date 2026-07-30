@@ -11,6 +11,7 @@
     "ios:repair": "node scripts/repair-ios-native-project.mjs",
     "ios:release-check": "node scripts/verify-ios-release-readiness.mjs",
     "ios:install-preflight": "node scripts/verify-ios-install-preflight.mjs",
+    "android:install-preflight": "node scripts/verify-android-install-preflight.mjs",
     "android": "expo run:android",
     "ios": "expo run:ios"
   },
@@ -18,7 +19,7 @@
     "@nursebridge/shared": "workspace:*",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@supabase/supabase-js": "^2.56.0",
-    "expo": "~54.0.34",
+    "expo": "~54.0.36",
     "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.0",
     "expo-device": "~8.0.10",

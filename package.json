@@ -14,6 +14,7 @@
     "dev:admin": "pnpm --filter @nursebridge/admin dev",
     "dev:mobile": "pnpm --filter @nursebridge/mobile dev",
     "lint": "pnpm -r lint",
+    "status": "node scripts/ops/show-build-status.mjs",
     "typecheck": "pnpm --filter @nursebridge/shared build && pnpm -r typecheck",
     "test": "pnpm -r test && node --test scripts/ops/test/*.test.mjs",
     "verify": "pnpm lint && pnpm typecheck && pnpm test"
