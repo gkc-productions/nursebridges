@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import {
@@ -24,7 +25,14 @@ import { loadApiConfig } from "./src/env";
 import { addForegroundNotificationListener, registerForPushNotificationsAsync } from "./src/push";
 import { canUsePatientProduct, patientProductAccessMessage } from "./src/product";
 import { getSupabaseClient } from "./src/supabase";
-import { darkColors, lightColors, type ThemeColors } from "./src/theme";
+import {
+  darkColors,
+  lightColors,
+  resolveThemeMode,
+  toggledThemeMode,
+  type ThemeColors,
+  type ThemeMode
+} from "./src/theme";
 import type {
   ApplicationListResponse,
   ApplicationRow,
@@ -44,7 +52,6 @@ import {
   buildNurseRequestDetailModel,
   buildNurseWorkflowSnapshot,
   buildPatientWorkflowSnapshot,
-  buildWorkflowEvidenceSummary,
   buildCreateCareRequestPayload,
   buildPatientRequestDetailModel,
   buildVerificationStoragePath,
@@ -66,6 +73,8 @@ import {
 
 type PatientTab = "home" | "new" | "records" | "updates" | "account";
 type NurseTab = "home" | "open" | "work" | "verification" | "updates" | "account";
+
+const THEME_STORAGE_KEY = "nursebridges.theme";
 
 let colors: ThemeColors = lightColors;
 let styles = createStyles(colors);
@@ -155,31 +164,6 @@ function WorkflowSnapshotPanel({ snapshot }: { snapshot: { status: string; nextS
       <SnapshotRow label="Status" value={snapshot.status} />
       <SnapshotRow label="Next" value={snapshot.nextStep} />
       <SnapshotRow label="Record" value={snapshot.record} />
-    </View>
-  );
-}
-
-function WorkflowEvidencePanel({
-  rows,
-  onCopy
-}: {
-  rows: Array<{ label: string; value: string }>;
-  onCopy: () => void;
-}) {
-  return (
-    <View style={styles.evidencePanel}>
-      <View style={styles.rowBetween}>
-        <Text style={styles.evidenceTitle}>Support snapshot</Text>
-        <TouchableOpacity style={styles.evidenceCopyButton} onPress={onCopy}>
-          <Text style={styles.evidenceCopyText}>Copy</Text>
-        </TouchableOpacity>
-      </View>
-      {rows.map((row) => (
-        <View key={row.label} style={styles.evidenceRow}>
-          <Text style={styles.evidenceLabel}>{row.label}</Text>
-          <Text style={styles.evidenceValue}>{row.value}</Text>
-        </View>
-      ))}
     </View>
   );
 }
@@ -600,7 +584,7 @@ function SectionHeader({
 
 export default function App() {
   const systemScheme = useColorScheme();
-  const [themeMode, setThemeMode] = useState<"light" | "dark">(systemScheme === "dark" ? "dark" : "light");
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => resolveThemeMode(systemScheme));
   colors = themeMode === "dark" ? darkColors : lightColors;
   styles = createStyles(colors);
   const supabase = useMemo(() => getSupabaseClient(), []);
@@ -630,8 +614,27 @@ export default function App() {
   const [jobForm, setJobForm] = useState(emptyJobForm);
   const [verificationDocumentType, setVerificationDocumentType] = useState("license");
   const lastAutoLoadKey = useRef<string | null>(null);
+  const passwordInputRef = useRef<TextInput>(null);
   const splashScale = useRef(new Animated.Value(0.82)).current;
   const splashOpacity = useRef(new Animated.Value(0.35)).current;
+
+  useEffect(() => {
+    let active = true;
+    void AsyncStorage.getItem(THEME_STORAGE_KEY).then((storedTheme) => {
+      if (active && (storedTheme === "light" || storedTheme === "dark")) {
+        setThemeMode(storedTheme);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function toggleTheme() {
+    const nextTheme = toggledThemeMode(themeMode);
+    setThemeMode(nextTheme);
+    void AsyncStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+  }
 
   useEffect(() => {
     const animation = Animated.loop(
@@ -651,7 +654,6 @@ export default function App() {
     return () => animation.stop();
   }, [splashOpacity, splashScale]);
 
-  const roleLabel = useMemo(() => role ?? "guest", [role]);
   const isApprovedNurse = nurseProfile?.verification_status === "approved";
   const unreadNotificationCount = notifications.filter((notification) => !notification.read_at).length;
   const activePatientJobs = patientJobs.filter((job) => job.status === "open" || job.status === "assigned").length;
@@ -770,27 +772,6 @@ export default function App() {
     nurseJobs.length,
     patientJobs.length,
     pendingApplications,
-    role,
-    unreadNotificationCount
-  ]);
-  const workflowEvidence = useMemo(() => {
-    const focusJob = role === "patient" ? patientFocusJob : role === "nurse" ? nurseFocusJob : null;
-    const totalRecords = role === "patient" ? patientJobs.length : role === "nurse" ? nurseJobs.length : 0;
-
-    return buildWorkflowEvidenceSummary({
-      role,
-      apiConfigured: Boolean(baseUrl),
-      focusedRequestId: focusJob?.id,
-      focusedRequestStatus: focusJob?.status,
-      totalRecords,
-      unreadNotifications: unreadNotificationCount
-    });
-  }, [
-    baseUrl,
-    nurseFocusJob,
-    nurseJobs.length,
-    patientFocusJob,
-    patientJobs.length,
     role,
     unreadNotificationCount
   ]);
@@ -1253,11 +1234,6 @@ export default function App() {
     setNotice("Issue details copied.");
   }
 
-  async function copyWorkflowEvidence() {
-    await Clipboard.setStringAsync(workflowEvidence.copyText);
-    setNotice("Support snapshot copied.");
-  }
-
   function confirmJobTransition(job: JobRow, action: "cancel" | "complete") {
     const confirmation = buildCareRequestTransitionConfirmation(action);
     Alert.alert(
@@ -1331,46 +1307,98 @@ export default function App() {
         showsVerticalScrollIndicator={false}
       >
         {!session ? (
-          <View style={styles.loginCard}>
-            <View style={styles.loginBrandRow}>
-              <Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.loginLogo} />
-              <View style={styles.flex}><Text style={styles.eyebrow}>Private beta</Text><Text style={styles.loginTitle}>Welcome back</Text></View>
+          <View style={styles.loginShell}>
+            <View style={styles.loginHero}>
+              <View style={styles.loginTopRow}>
+                <Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.loginLogo} />
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={`Use ${themeMode === "dark" ? "light" : "dark"} appearance`}
+                  style={styles.themeButton}
+                  onPress={toggleTheme}
+                >
+                  <Text style={styles.themeButtonText}>{themeMode === "dark" ? "Light" : "Dark"}</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.loginBrandName}>NurseBridges</Text>
+              <Text style={styles.loginHeroTitle}>Care coordination that feels clear.</Text>
+              <Text style={styles.loginHeroBody}>
+                Request trusted support, follow every update, and keep the people you care about informed.
+              </Text>
             </View>
-            <Text style={styles.sectionIntro}>Sign in to coordinate care with your trusted circle.</Text>
-            <Text style={styles.inputLabel}>Email</Text>
-            <TextInput style={styles.input} placeholder="you@example.com" placeholderTextColor={colors.mutedSoft} autoCapitalize="none" keyboardType="email-address" textContentType="emailAddress" returnKeyType="next" value={email} onChangeText={setEmail} />
-            <Text style={styles.inputLabel}>Password</Text>
-            <TextInput style={styles.input} placeholder="Your password" placeholderTextColor={colors.mutedSoft} secureTextEntry textContentType="password" returnKeyType="go" onSubmitEditing={handleSignIn} value={password} onChangeText={setPassword} />
-            <TouchableOpacity style={styles.button} onPress={handleSignIn} disabled={actionLoading}>
-              {actionLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Continue securely</Text>}
-            </TouchableOpacity>
+            <View style={styles.loginCard}>
+              <Text style={styles.eyebrow}>Patient and family access</Text>
+              <Text style={styles.loginTitle}>Welcome back</Text>
+              <Text style={styles.sectionIntro}>Sign in with the account from your NurseBridges invitation.</Text>
+              <Text style={styles.inputLabel}>Email</Text>
+              <TextInput
+                accessibilityLabel="Email address"
+                style={styles.input}
+                placeholder="you@example.com"
+                placeholderTextColor={colors.mutedSoft}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordInputRef.current?.focus()}
+                value={email}
+                onChangeText={setEmail}
+              />
+              <Text style={styles.inputLabel}>Password</Text>
+              <TextInput
+                ref={passwordInputRef}
+                accessibilityLabel="Password"
+                style={styles.input}
+                placeholder="Your password"
+                placeholderTextColor={colors.mutedSoft}
+                autoComplete="current-password"
+                secureTextEntry
+                textContentType="password"
+                returnKeyType="go"
+                onSubmitEditing={handleSignIn}
+                value={password}
+                onChangeText={setPassword}
+              />
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Continue securely"
+                style={styles.button}
+                onPress={handleSignIn}
+                disabled={actionLoading}
+              >
+                {actionLoading ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.buttonText}>Continue securely</Text>}
+              </TouchableOpacity>
+              <Text style={styles.loginSafety}>Not for emergencies. For urgent needs, contact local emergency services.</Text>
+            </View>
           </View>
         ) : null}
-        <View style={styles.headerPanel}>
+        {session ? <View style={styles.headerPanel}>
           <View style={styles.brandRow}>
             <View style={styles.brandIdentity}>
               <View style={styles.headerLogoWrap}><Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.headerLogo} /></View>
               <View><Text style={styles.brandName}>NurseBridges</Text><Text style={styles.brandCaption}>Care, connected.</Text></View>
             </View>
-            <TouchableOpacity onPress={() => setThemeMode(themeMode === "dark" ? "light" : "dark")}><Text style={styles.environmentTag}>{themeMode === "dark" ? "Light" : "Dark"}</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Use ${themeMode === "dark" ? "light" : "dark"} appearance`} onPress={toggleTheme}>
+              <Text style={styles.environmentTag}>{themeMode === "dark" ? "Light" : "Dark"}</Text>
+            </TouchableOpacity>
           </View>
           <Text style={styles.title}>{getRoleHeadline(role)}</Text>
           <Text style={styles.subTitle}>{getRoleSubhead(role)}</Text>
           <WorkflowSnapshotPanel snapshot={workflowSnapshot} />
-          {session ? <WorkflowEvidencePanel rows={workflowEvidence.rows} onCopy={copyWorkflowEvidence} /> : null}
           <View style={styles.metricsGrid}>
             {dashboardMetrics.map((metric) => (
               <MetricTile key={metric.label} label={metric.label} value={metric.value} />
             ))}
           </View>
           <View style={styles.headerMetaRow}>
-            <Text style={styles.headerMeta}>Role: {roleLabel}</Text>
-            <Text style={styles.headerMeta}>API: {baseUrl ? "connected" : "pending"}</Text>
+            <Text style={styles.headerMeta}>Patient account</Text>
             {unreadNotificationCount > 0 ? (
               <Text style={styles.headerMeta}>{unreadNotificationCount} unread</Text>
             ) : null}
           </View>
-        </View>
+        </View> : null}
 
         {error ? <ErrorNotice message={error} onCopy={copyErrorDetails} /> : null}
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
@@ -1908,11 +1936,12 @@ return StyleSheet.create({
   splashImage: { width: 108, height: 108, resizeMode: "contain" },
   splashName: { color: colors.ink, fontSize: 28, fontWeight: "900", letterSpacing: -1.2 },
   content: {
+    flexGrow: 1,
     padding: 16,
     paddingBottom: 44
   },
   headerPanel: {
-    backgroundColor: colors.ink,
+    backgroundColor: colors.hero,
     borderRadius: 28,
     marginBottom: 16,
     padding: 18,
@@ -1932,12 +1961,12 @@ return StyleSheet.create({
   headerLogoWrap: { alignItems: "center", backgroundColor: "#E9FFFA", borderRadius: 13, height: 42, justifyContent: "center", overflow: "hidden", width: 42 },
   headerLogo: { height: 48, resizeMode: "contain", width: 48 },
   brandName: {
-    color: "#FFFFFF",
+    color: colors.heroText,
     fontSize: 17,
     fontWeight: "800"
   },
   brandCaption: {
-    color: "#B8C6D1",
+    color: colors.heroMuted,
     fontSize: 12,
     fontWeight: "700",
     marginTop: 2
@@ -1955,12 +1984,12 @@ return StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: colors.heroText,
     marginBottom: 8
   },
   subTitle: {
     fontSize: 14,
-    color: "#D5DEE6",
+    color: colors.heroMuted,
     lineHeight: 20,
     marginBottom: 14
   },
@@ -1970,8 +1999,8 @@ return StyleSheet.create({
     marginBottom: 14
   },
   metricTile: {
-    backgroundColor: "#1B2A35",
-    borderColor: "#314452",
+    backgroundColor: colors.heroSurface,
+    borderColor: colors.heroBorder,
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
@@ -1980,75 +2009,26 @@ return StyleSheet.create({
     justifyContent: "space-between"
   },
   metricValue: {
-    color: "#FFFFFF",
+    color: colors.heroText,
     fontSize: 18,
     fontWeight: "900"
   },
   metricLabel: {
-    color: "#B8C6D1",
+    color: colors.heroMuted,
     fontSize: 10,
     fontWeight: "800",
     lineHeight: 13,
     textTransform: "uppercase"
   },
   workflowSnapshot: {
-    backgroundColor: "#162532",
-    borderColor: "#334657",
+    backgroundColor: colors.heroSurface,
+    borderColor: colors.heroBorder,
     borderRadius: 8,
     borderWidth: 1,
     marginBottom: 14
   },
-  evidencePanel: {
-    backgroundColor: "#102030",
-    borderColor: "#334657",
-    borderRadius: 8,
-    borderWidth: 1,
-    marginBottom: 14,
-    padding: 12
-  },
-  evidenceTitle: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "900",
-    marginBottom: 8
-  },
-  evidenceCopyButton: {
-    backgroundColor: "#E8EEF5",
-    borderRadius: 6,
-    minHeight: 30,
-    paddingHorizontal: 10,
-    paddingVertical: 6
-  },
-  evidenceCopyText: {
-    color: colors.ink,
-    fontSize: 11,
-    fontWeight: "900"
-  },
-  evidenceRow: {
-    borderTopColor: "#24384A",
-    borderTopWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "space-between",
-    paddingVertical: 7
-  },
-  evidenceLabel: {
-    color: "#AFC0CC",
-    flex: 0.9,
-    fontSize: 11,
-    fontWeight: "800",
-    textTransform: "uppercase"
-  },
-  evidenceValue: {
-    color: "#FFFFFF",
-    flex: 1.5,
-    fontSize: 12,
-    fontWeight: "800",
-    lineHeight: 16,
-    textAlign: "right"
-  },
   snapshotRow: {
-    borderBottomColor: "#2B3D4D",
+    borderBottomColor: colors.heroBorder,
     borderBottomWidth: 1,
     flexDirection: "row",
     gap: 12,
@@ -2057,14 +2037,14 @@ return StyleSheet.create({
     paddingVertical: 10
   },
   snapshotLabel: {
-    color: "#AFC0CC",
+    color: colors.heroMuted,
     flex: 0.8,
     fontSize: 11,
     fontWeight: "800",
     textTransform: "uppercase"
   },
   snapshotValue: {
-    color: "#FFFFFF",
+    color: colors.heroText,
     flex: 1.6,
     fontSize: 12,
     fontWeight: "800",
@@ -2077,9 +2057,9 @@ return StyleSheet.create({
     gap: 8
   },
   headerMeta: {
-    backgroundColor: "#243241",
+    backgroundColor: colors.heroSurface,
     borderRadius: 999,
-    color: "#E8EEF5",
+    color: colors.heroText,
     fontSize: 12,
     fontWeight: "700",
     paddingHorizontal: 10,
@@ -2093,10 +2073,18 @@ return StyleSheet.create({
     padding: 15,
     marginBottom: 12
   },
+  loginShell: { flex: 1, gap: 16, justifyContent: "center", paddingVertical: 18 },
+  loginHero: { backgroundColor: colors.hero, borderRadius: 30, padding: 22 },
+  loginTopRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 22 },
+  loginLogo: { height: 78, resizeMode: "contain", width: 78 },
+  loginBrandName: { color: colors.heroMuted, fontSize: 15, fontWeight: "800", marginBottom: 22 },
+  loginHeroTitle: { color: colors.heroText, fontSize: 32, fontWeight: "900", letterSpacing: -1.2, lineHeight: 37, marginBottom: 12, maxWidth: 310 },
+  loginHeroBody: { color: colors.heroMuted, fontSize: 15, lineHeight: 22, maxWidth: 340 },
+  themeButton: { backgroundColor: colors.heroSurface, borderColor: colors.heroBorder, borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },
+  themeButtonText: { color: colors.heroText, fontSize: 12, fontWeight: "800" },
   loginCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 26, borderWidth: 1, marginBottom: 14, padding: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 24 },
-  loginBrandRow: { alignItems: "center", flexDirection: "row", gap: 12, marginBottom: 14 },
-  loginLogo: { height: 58, resizeMode: "contain", width: 58 },
   loginTitle: { color: colors.ink, fontSize: 25, fontWeight: "900", letterSpacing: -0.8 },
+  loginSafety: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 14, textAlign: "center" },
   productGate: {
     alignSelf: "center",
     backgroundColor: colors.surface,
@@ -2179,7 +2167,7 @@ return StyleSheet.create({
     fontWeight: "800"
   },
   tabButtonTextActive: {
-    color: "#FFFFFF"
+    color: colors.onAccent
   },
   rowBetween: {
     flexDirection: "row",
@@ -2257,7 +2245,7 @@ return StyleSheet.create({
   timelineDot: {
     backgroundColor: colors.accent,
     borderRadius: 999,
-    color: "#FFFFFF",
+    color: colors.onAccent,
     fontSize: 9,
     fontWeight: "900",
     height: 24,
@@ -2302,7 +2290,7 @@ return StyleSheet.create({
     paddingVertical: 10
   },
   detailPrimaryActionText: {
-    color: "#FFFFFF",
+    color: colors.onAccent,
     fontSize: 12,
     fontWeight: "800"
   },
@@ -2364,7 +2352,7 @@ return StyleSheet.create({
     marginTop: 8
   },
   buttonText: {
-    color: "#FFFFFF",
+    color: colors.onAccent,
     fontWeight: "800"
   },
   secondaryButton: {
