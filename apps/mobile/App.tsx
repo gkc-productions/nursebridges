@@ -22,6 +22,7 @@ import type { Session } from "@supabase/supabase-js";
 import { apiFetch, formatApiErrorMessage } from "./src/api";
 import { loadApiConfig } from "./src/env";
 import { addForegroundNotificationListener, registerForPushNotificationsAsync } from "./src/push";
+import { canUsePatientProduct, patientProductAccessMessage } from "./src/product";
 import { getSupabaseClient } from "./src/supabase";
 import { darkColors, lightColors, type ThemeColors } from "./src/theme";
 import type {
@@ -1295,6 +1296,31 @@ export default function App() {
     );
   }
 
+  if (session && role && !canUsePatientProduct(role)) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.productGate}>
+          <Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.productGateLogo} />
+          <Text style={styles.eyebrow}>Account destination</Text>
+          <Text style={styles.productGateTitle}>You’re signed in to the Patient app</Text>
+          <Text style={styles.productGateBody}>{patientProductAccessMessage(role)}</Text>
+          <Text style={styles.productGateHint}>
+            Your account and data are unchanged. Sign out here, then use the correct NurseBridges product.
+          </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Sign out of the NurseBridges Patient app"
+            style={styles.button}
+            onPress={handleSignOut}
+            disabled={actionLoading}
+          >
+            {actionLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Sign out</Text>}
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
@@ -2071,6 +2097,29 @@ return StyleSheet.create({
   loginBrandRow: { alignItems: "center", flexDirection: "row", gap: 12, marginBottom: 14 },
   loginLogo: { height: 58, resizeMode: "contain", width: 58 },
   loginTitle: { color: colors.ink, fontSize: 25, fontWeight: "900", letterSpacing: -0.8 },
+  productGate: {
+    alignSelf: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 28,
+    borderWidth: 1,
+    marginHorizontal: 20,
+    marginTop: 72,
+    maxWidth: 460,
+    padding: 24,
+    width: "90%"
+  },
+  productGateLogo: { height: 72, marginBottom: 18, resizeMode: "contain", width: 72 },
+  productGateTitle: {
+    color: colors.ink,
+    fontSize: 25,
+    fontWeight: "900",
+    letterSpacing: -0.8,
+    lineHeight: 30,
+    marginBottom: 10
+  },
+  productGateBody: { color: colors.inkSoft, fontSize: 16, lineHeight: 23, marginBottom: 12 },
+  productGateHint: { color: colors.muted, fontSize: 13, lineHeight: 19, marginBottom: 8 },
   identityPanel: {
     backgroundColor: colors.surface,
     borderColor: colors.borderStrong,
@@ -2080,7 +2129,7 @@ return StyleSheet.create({
     marginBottom: 12
   },
   nextActionPanel: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderColor: colors.accent,
     borderLeftWidth: 4,
     borderRadius: 8,
