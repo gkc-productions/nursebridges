@@ -31,7 +31,7 @@ export async function registerAdminAssignmentRoute(app: FastifyInstance, deps: A
 
     const { data: job, error: jobError } = await deps.supabaseAdmin
       .from("jobs")
-      .select("id,status,title")
+      .select("id,status,title,patient_user_id")
       .eq("id", body.jobId)
       .single();
 
@@ -59,6 +59,7 @@ export async function registerAdminAssignmentRoute(app: FastifyInstance, deps: A
       jobId: body.jobId,
       jobTitle: job.title,
       selectedNurseUserId: body.nurseUserId,
+          ...(job.patient_user_id ? { patientUserId: job.patient_user_id } : {}),
       actorRole: "admin"
     });
 
@@ -81,6 +82,7 @@ export async function registerAdminAssignmentRoute(app: FastifyInstance, deps: A
         jobTitle: job.title,
         selectedApplicationId: (assignmentPlan.selectedApplication as any).id,
         selectedNurseUserId: body.nurseUserId,
+        ...(job.patient_user_id ? { patientUserId: job.patient_user_id } : {}),
         actorId: authed.userId,
         actorRole: authed.role
       }

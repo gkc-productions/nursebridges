@@ -103,7 +103,7 @@ describe("mobile workflow helpers", () => {
         start_time: "not a date",
         hourly_rate: ""
       }),
-      { ok: false, error: "Enter a valid date/time or leave it blank. Example: 2026-05-01T14:00:00Z." }
+      { ok: false, error: "Use a date within the next two years, or leave it blank. Example: 2026-08-05 10:00 AM." }
     );
     assert.deepEqual(
       buildCreateCareRequestPayload({

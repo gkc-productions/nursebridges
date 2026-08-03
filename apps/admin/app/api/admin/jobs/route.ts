@@ -68,11 +68,19 @@ export async function GET(request: NextRequest) {
   }
 
   const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+  const identityLabels = new Map<string, string>();
+  await Promise.all(allIds.map(async (profileId) => {
+    const profile = profileMap.get(profileId);
+    if (profile?.full_name) {
+      identityLabels.set(profileId, profile.full_name);
+      return;
+    }
+    const { data } = await supabaseAdmin.auth.admin.getUserById(profileId);
+    if (data?.user?.email) identityLabels.set(profileId, data.user.email);
+  }));
 
   const merged = (jobs ?? []).map((job: JobRow) => {
     const nurseId = acceptedNurseByJob.get(job.id) ?? null;
-    const patientProfile = profileMap.get(job.patient_user_id ?? "");
-    const nurseProfile = nurseId ? profileMap.get(nurseId) : undefined;
     return {
       id: job.id,
       status: job.status,
@@ -83,8 +91,8 @@ export async function GET(request: NextRequest) {
       hourly_rate: job.hourly_rate ?? null,
       created_at: job.created_at,
       applicant_count: applicantCountByJob.get(job.id) ?? 0,
-      patient_name: patientProfile?.full_name ?? null,
-      nurse_name: nurseProfile?.full_name ?? null
+      patient_name: identityLabels.get(job.patient_user_id ?? "") ?? null,
+      nurse_name: nurseId ? identityLabels.get(nurseId) ?? null : null
     };
   });
 

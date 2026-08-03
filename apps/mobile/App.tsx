@@ -3,13 +3,19 @@ import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import {
   ActivityIndicator,
+  Animated,
   Alert,
+  Easing,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useColorScheme,
   View
 } from "react-native";
 import type { Session } from "@supabase/supabase-js";
@@ -17,7 +23,7 @@ import { apiFetch, formatApiErrorMessage } from "./src/api";
 import { loadApiConfig } from "./src/env";
 import { addForegroundNotificationListener, registerForPushNotificationsAsync } from "./src/push";
 import { getSupabaseClient } from "./src/supabase";
-import { colors } from "./src/theme";
+import { darkColors, lightColors, type ThemeColors } from "./src/theme";
 import type {
   ApplicationListResponse,
   ApplicationRow,
@@ -59,6 +65,9 @@ import {
 
 type PatientTab = "home" | "new" | "records" | "updates" | "account";
 type NurseTab = "home" | "open" | "work" | "verification" | "updates" | "account";
+
+let colors: ThemeColors = lightColors;
+let styles = createStyles(colors);
 
 function getUploadErrorMessage(message: string | undefined) {
   const text = message ?? "";
@@ -412,7 +421,7 @@ function AccountPanel({
     <View style={styles.card}>
       <SectionHeader eyebrow="Account" title="Beta access and support" />
       <Text style={styles.sectionIntro}>
-        NurseBridge is a closed beta care coordination tool. It is not an emergency service.
+        NurseBridges is a closed beta care coordination tool. It is not an emergency service.
       </Text>
       <FieldRow label="Signed in as" value={email ?? "Unknown"} />
       <FieldRow label="Role" value={role ?? "Unknown"} />
@@ -438,7 +447,7 @@ function PatientSupportSafetyPanel({ onOpenAccount }: { onOpenAccount: () => voi
     <View style={styles.supportPanel}>
       <Text style={styles.supportTitle}>Support and safety</Text>
       <Text style={styles.emptyText}>
-        NurseBridge is for closed-beta care coordination and is not an emergency service. For urgent medical or safety
+        NurseBridges is for closed-beta care coordination and is not an emergency service. For urgent medical or safety
         needs, use local emergency services or the patient's normal care contact.
       </Text>
       <TouchableOpacity style={styles.textAction} onPress={onOpenAccount}>
@@ -589,6 +598,10 @@ function SectionHeader({
 }
 
 export default function App() {
+  const systemScheme = useColorScheme();
+  const [themeMode, setThemeMode] = useState<"light" | "dark">(systemScheme === "dark" ? "dark" : "light");
+  colors = themeMode === "dark" ? darkColors : lightColors;
+  styles = createStyles(colors);
   const supabase = useMemo(() => getSupabaseClient(), []);
   const [baseUrl, setBaseUrl] = useState("");
   const [session, setSession] = useState<Session | null>(null);
@@ -616,6 +629,26 @@ export default function App() {
   const [jobForm, setJobForm] = useState(emptyJobForm);
   const [verificationDocumentType, setVerificationDocumentType] = useState("license");
   const lastAutoLoadKey = useRef<string | null>(null);
+  const splashScale = useRef(new Animated.Value(0.82)).current;
+  const splashOpacity = useRef(new Animated.Value(0.35)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(splashScale, { toValue: 1, duration: 650, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+          Animated.timing(splashOpacity, { toValue: 1, duration: 500, useNativeDriver: true })
+        ]),
+        Animated.delay(220),
+        Animated.parallel([
+          Animated.timing(splashScale, { toValue: 0.92, duration: 520, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+          Animated.timing(splashOpacity, { toValue: 0.72, duration: 520, useNativeDriver: true })
+        ])
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [splashOpacity, splashScale]);
 
   const roleLabel = useMemo(() => role ?? "guest", [role]);
   const isApprovedNurse = nurseProfile?.verification_status === "approved";
@@ -892,6 +925,10 @@ export default function App() {
 
     void loadNotifications();
   }, [baseUrl, role, screenLoading, session, nurseProfile?.verification_status]);
+
+  useEffect(() => {
+    setNotice(null);
+  }, [patientTab, nurseTab, session?.user.id]);
 
   useEffect(() => {
     if (!session || !baseUrl) return;
@@ -1241,8 +1278,11 @@ export default function App() {
   if (bootLoading) {
     return (
       <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.accent} />
-        <Text style={styles.meta}>Loading NurseBridge...</Text>
+        <Animated.View style={[styles.splashMark, { opacity: splashOpacity, transform: [{ scale: splashScale }] }]}>
+          <Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.splashImage} />
+        </Animated.View>
+        <Text style={styles.splashName}>NurseBridges</Text>
+        <Text style={styles.meta}>Care is on the way.</Text>
       </SafeAreaView>
     );
   }
@@ -1257,23 +1297,41 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
       >
+        {!session ? (
+          <View style={styles.loginCard}>
+            <View style={styles.loginBrandRow}>
+              <Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.loginLogo} />
+              <View style={styles.flex}><Text style={styles.eyebrow}>Private beta</Text><Text style={styles.loginTitle}>Welcome back</Text></View>
+            </View>
+            <Text style={styles.sectionIntro}>Sign in to coordinate care with your trusted circle.</Text>
+            <Text style={styles.inputLabel}>Email</Text>
+            <TextInput style={styles.input} placeholder="you@example.com" placeholderTextColor={colors.mutedSoft} autoCapitalize="none" keyboardType="email-address" textContentType="emailAddress" returnKeyType="next" value={email} onChangeText={setEmail} />
+            <Text style={styles.inputLabel}>Password</Text>
+            <TextInput style={styles.input} placeholder="Your password" placeholderTextColor={colors.mutedSoft} secureTextEntry textContentType="password" returnKeyType="go" onSubmitEditing={handleSignIn} value={password} onChangeText={setPassword} />
+            <TouchableOpacity style={styles.button} onPress={handleSignIn} disabled={actionLoading}>
+              {actionLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Continue securely</Text>}
+            </TouchableOpacity>
+          </View>
+        ) : null}
         <View style={styles.headerPanel}>
           <View style={styles.brandRow}>
-            <View>
-              <Text style={styles.brandName}>NurseBridge</Text>
-              <Text style={styles.brandCaption}>Care coordination beta</Text>
+            <View style={styles.brandIdentity}>
+              <View style={styles.headerLogoWrap}><Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.headerLogo} /></View>
+              <View><Text style={styles.brandName}>NurseBridges</Text><Text style={styles.brandCaption}>Care, connected.</Text></View>
             </View>
-            <Text style={styles.environmentTag}>Closed beta</Text>
+            <TouchableOpacity onPress={() => setThemeMode(themeMode === "dark" ? "light" : "dark")}><Text style={styles.environmentTag}>{themeMode === "dark" ? "Light" : "Dark"}</Text></TouchableOpacity>
           </View>
           <Text style={styles.title}>{getRoleHeadline(role)}</Text>
           <Text style={styles.subTitle}>{getRoleSubhead(role)}</Text>
           <WorkflowSnapshotPanel snapshot={workflowSnapshot} />
-          <WorkflowEvidencePanel rows={workflowEvidence.rows} onCopy={copyWorkflowEvidence} />
+          {session ? <WorkflowEvidencePanel rows={workflowEvidence.rows} onCopy={copyWorkflowEvidence} /> : null}
           <View style={styles.metricsGrid}>
             {dashboardMetrics.map((metric) => (
               <MetricTile key={metric.label} label={metric.label} value={metric.value} />
@@ -1291,30 +1349,7 @@ export default function App() {
         {error ? <ErrorNotice message={error} onCopy={copyErrorDetails} /> : null}
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
-        {!session ? (
-          <View style={styles.card}>
-            <SectionHeader eyebrow="Secure access" title="Sign in to continue" />
-            <Text style={styles.sectionIntro}>Use your beta patient, nurse, or admin account.</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              value={email}
-              onChangeText={setEmail}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
-            <TouchableOpacity style={styles.button} onPress={handleSignIn} disabled={actionLoading}>
-              {actionLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Sign In</Text>}
-            </TouchableOpacity>
-          </View>
-        ) : (
+        {!session ? null : (
           <>
             {role === "admin" ? (
               <View style={styles.identityPanel}>
@@ -1545,7 +1580,7 @@ export default function App() {
                     <Text style={styles.inputLabel}>Requested date/time</Text>
                     <TextInput
                       style={styles.input}
-                      placeholder="Start time, for example 2026-05-01T14:00:00Z"
+                      placeholder="2026-08-05 10:00 AM"
                       autoCapitalize="none"
                       value={jobForm.start_time}
                       onChangeText={(text) => setJobForm((prev) => ({ ...prev, start_time: text }))}
@@ -1825,11 +1860,13 @@ export default function App() {
           </>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background
@@ -1841,13 +1878,16 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: colors.background
   },
+  splashMark: { width: 112, height: 112, borderRadius: 32, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", marginBottom: 18 },
+  splashImage: { width: 108, height: 108, resizeMode: "contain" },
+  splashName: { color: colors.ink, fontSize: 28, fontWeight: "900", letterSpacing: -1.2 },
   content: {
-    padding: 14,
+    padding: 16,
     paddingBottom: 44
   },
   headerPanel: {
     backgroundColor: colors.ink,
-    borderRadius: 8,
+    borderRadius: 28,
     marginBottom: 16,
     padding: 18,
     shadowColor: "#000000",
@@ -1862,9 +1902,12 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 16
   },
+  brandIdentity: { alignItems: "center", flexDirection: "row", gap: 10 },
+  headerLogoWrap: { alignItems: "center", backgroundColor: "#E9FFFA", borderRadius: 13, height: 42, justifyContent: "center", overflow: "hidden", width: 42 },
+  headerLogo: { height: 48, resizeMode: "contain", width: 48 },
   brandName: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "800"
   },
   brandCaption: {
@@ -1875,7 +1918,7 @@ const styles = StyleSheet.create({
   },
   environmentTag: {
     backgroundColor: colors.accentMuted,
-    borderRadius: 6,
+    borderRadius: 999,
     color: colors.accentDark,
     fontSize: 11,
     fontWeight: "800",
@@ -2019,11 +2062,15 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 22,
     borderWidth: 1,
     padding: 15,
     marginBottom: 12
   },
+  loginCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 26, borderWidth: 1, marginBottom: 14, padding: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 24 },
+  loginBrandRow: { alignItems: "center", flexDirection: "row", gap: 12, marginBottom: 14 },
+  loginLogo: { height: 58, resizeMode: "contain", width: 58 },
+  loginTitle: { color: colors.ink, fontSize: 25, fontWeight: "900", letterSpacing: -0.8 },
   identityPanel: {
     backgroundColor: colors.surface,
     borderColor: colors.borderStrong,
@@ -2067,7 +2114,7 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: 14,
     borderWidth: 1,
     minHeight: 40,
     paddingHorizontal: 10,
@@ -2246,7 +2293,9 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 6,
     marginBottom: 12,
-    backgroundColor: colors.surface
+    backgroundColor: colors.surfaceMuted,
+    color: colors.ink,
+    minHeight: 52
   },
   inputLabel: {
     color: colors.inkSoft,
@@ -2261,13 +2310,13 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: colors.accent,
     paddingVertical: 12,
-    borderRadius: 6,
+    borderRadius: 14,
     alignItems: "center",
     marginTop: 8
   },
   buttonText: {
     color: "#FFFFFF",
-    fontWeight: "600"
+    fontWeight: "800"
   },
   secondaryButton: {
     alignSelf: "flex-start",
@@ -2419,3 +2468,4 @@ const styles = StyleSheet.create({
     marginBottom: 12
   }
 });
+}

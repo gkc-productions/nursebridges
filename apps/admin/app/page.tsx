@@ -50,8 +50,14 @@ export default function Dashboard() {
   }, []);
 
   return (
+    <>
+    <section className="hero-panel">
+      <div><p className="eyebrow">Live care operations</p><h2>Everything your care team needs, in one calm view.</h2><p>Review incoming requests, clear credentialing decisions, and keep every care handoff visible.</p></div>
+      <Link className="button" href="/jobs">Open dispatch queue →</Link>
+    </section>
+
     <section>
-      <h2>Overview</h2>
+      <div className="section-heading"><div><p className="eyebrow">Today</p><h2>Operations overview</h2></div><span className="live-pill"><i /> Live</span></div>
 
       {error ? (
         <p className="notice">
@@ -61,18 +67,22 @@ export default function Dashboard() {
 
       <div className="cards">
         <div className="card">
-          <div className="label">USERS</div>
+          <div className="label">People</div>
           <div className="value">{overview?.users ?? 0}</div>
+          <p>Patient, nurse, and admin profiles</p>
         </div>
         <div className="card">
-          <div className="label">JOBS</div>
+          <div className="label">Care requests</div>
           <div className="value">{overview?.jobs ?? 0}</div>
+          <p>Across the complete care lifecycle</p>
         </div>
         <div className="card">
-          <div className="label">NURSES</div>
+          <div className="label">Care professionals</div>
           <div className="value">{overview?.nurses ?? 0}</div>
+          <p>Credentialing records to review</p>
         </div>
       </div>
     </section>
+    </>
   );
 }

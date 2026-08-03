@@ -34,10 +34,13 @@ export default function LoginPage() {
   };
 
   return (
-    <section>
-      <h2>Admin Login</h2>
+    <section className="login-panel">
+      <div className="login-copy"><p className="eyebrow">Secure operations</p><h2>Welcome back.</h2><p>Sign in to coordinate care requests, verification, and assignments. Access is limited to approved NurseBridges operators.</p><div className="secure-note">Protected workspace · Activity is auditable</div></div>
+      <div className="login-form">
+      <h3>Operator sign in</h3>
       {error ? <p className="notice">{error}</p> : null}
       <div className="grid">
+        <label>Email address</label>
         <input
           className="input"
           placeholder="Email"
@@ -45,6 +48,7 @@ export default function LoginPage() {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
         />
+        <label>Password</label>
         <input
           className="input"
           placeholder="Password"
@@ -56,6 +60,7 @@ export default function LoginPage() {
         <button className="button" onClick={handleLogin} disabled={loading}>
           {loading ? "Signing in..." : "Sign in"}
         </button>
+      </div>
       </div>
     </section>
   );

@@ -142,7 +142,7 @@ export function createAssignmentApplicationPlan<TApplication extends AssignmentA
 
 export type AssignmentNotification = {
   userId: string;
-  type: "job_assigned" | "application_rejected";
+  type: "job_assigned" | "care_team_assigned" | "application_rejected";
   title: string;
   body: string;
   entityType: "job";
@@ -153,6 +153,7 @@ export function buildAssignmentNotifications(input: {
   jobId: string;
   jobTitle?: string | null;
   selectedNurseUserId: string;
+  patientUserId?: string | null;
   rejectedNurseIds: string[];
 }): AssignmentNotification[] {
   return [
@@ -164,6 +165,16 @@ export function buildAssignmentNotifications(input: {
       entityType: "job",
       entityId: input.jobId
     },
+    ...(input.patientUserId
+      ? [{
+          userId: input.patientUserId,
+          type: "care_team_assigned" as const,
+          title: "Care team assigned",
+          body: "A nurse or caregiver has been assigned to your care request.",
+          entityType: "job" as const,
+          entityId: input.jobId
+        }]
+      : []),
     ...input.rejectedNurseIds.map((nurseUserId) => ({
       userId: nurseUserId,
       type: "application_rejected" as const,
@@ -193,6 +204,7 @@ export function createAssignmentCommandPlan<TApplication extends AssignmentAppli
   jobId: string;
   jobTitle?: string | null;
   selectedNurseUserId: string;
+  patientUserId?: string | null;
   actorRole?: string;
 }): AssignmentCommandPlan<TApplication> {
   const applicationPlan = createAssignmentApplicationPlan(input.applications, input.selectedNurseUserId);
@@ -207,6 +219,7 @@ export function createAssignmentCommandPlan<TApplication extends AssignmentAppli
           jobId: input.jobId,
           jobTitle: input.jobTitle,
           selectedNurseUserId: input.selectedNurseUserId,
+          patientUserId: input.patientUserId,
           rejectedNurseIds: applicationPlan.rejectedNurseIds
         })
       : [],

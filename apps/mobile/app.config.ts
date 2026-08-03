@@ -4,13 +4,13 @@ const easProjectId =
 
 export default {
   expo: {
-    name: "NurseBridge",
+    name: "NurseBridges",
     slug: "nursebridges",
     scheme: "nursebridges",
     version: "0.1.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
-    userInterfaceStyle: "light",
+    userInterfaceStyle: "automatic",
     plugins: ["expo-secure-store"],
     splash: {
       image: "./assets/splash.png",
@@ -25,7 +25,7 @@ export default {
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSFaceIDUsageDescription:
-          "NurseBridge uses Face ID only when you choose to protect local app access on this device."
+          "NurseBridges uses Face ID only when you choose to protect local app access on this device."
       }
     },
     android: {

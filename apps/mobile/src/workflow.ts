@@ -413,6 +413,9 @@ export function parseStartTimeInput(value: string) {
   const date = new Date(trimmed);
   if (Number.isNaN(date.getTime())) return null;
 
+  const currentYear = new Date().getFullYear();
+  if (date.getFullYear() < currentYear || date.getFullYear() > currentYear + 2) return null;
+
   return date.toISOString();
 }
 
@@ -446,7 +449,7 @@ export function buildCreateCareRequestPayload(form: CreateCareRequestForm): Crea
   if (startTime === null) {
     return {
       ok: false,
-      error: "Enter a valid date/time or leave it blank. Example: 2026-05-01T14:00:00Z."
+      error: "Use a date within the next two years, or leave it blank. Example: 2026-08-05 10:00 AM."
     };
   }
 

@@ -70,7 +70,7 @@ assertIncludes(infoPlist, "<string>1</string>", "Info.plist");
 assertIncludes(infoPlist, "<string>nursebridges</string>", "Info.plist");
 assertIncludes(infoPlist, "<string>com.nursebridges.mobile</string>", "Info.plist");
 assertIncludes(infoPlist, "ITSAppUsesNonExemptEncryption", "Info.plist");
-assertIncludes(infoPlist, "NurseBridge uses Face ID only", "Info.plist");
+assertIncludes(infoPlist, "NurseBridges uses Face ID only", "Info.plist");
 
 assertIncludes(project, "MARKETING_VERSION = 0.1.0;", "project.pbxproj");
 assertIncludes(project, "CURRENT_PROJECT_VERSION = 1;", "project.pbxproj");

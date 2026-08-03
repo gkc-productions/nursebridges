@@ -59,7 +59,7 @@ export function createAdminJobAssignmentActions(deps: AdminAssignmentDeps) {
   async function assignJobAsAdmin(input: { jobId: string; nurseId: string; actorId: string }) {
     const { data: job, error: jobError } = await deps.supabaseAdmin
       .from("jobs")
-      .select("id,status,title")
+      .select("id,status,title,patient_user_id")
       .eq("id", input.jobId)
       .single();
 
@@ -87,6 +87,7 @@ export function createAdminJobAssignmentActions(deps: AdminAssignmentDeps) {
       jobId: input.jobId,
       jobTitle: job.title,
       selectedNurseUserId: input.nurseId,
+      patientUserId: job.patient_user_id,
       actorRole: "admin"
     });
     if (!assignmentPlan.selectedApplication) {

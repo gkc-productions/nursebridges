@@ -78,6 +78,14 @@ async function fetchAssignedNurseMap(jobIds: string[], jwt: string) {
     for (const p of profiles ?? []) {
       names.set(p.id as string, (p as any).full_name ?? "");
     }
+
+    await Promise.all(
+      nurseIds.filter((id) => !names.get(id)).map(async (id) => {
+        const { data } = await supabaseAdmin.auth.admin.getUserById(id);
+        const email = data?.user?.email;
+        if (email) names.set(id, email);
+      })
+    );
   }
 
   return { assigned, names };

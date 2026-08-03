@@ -11,6 +11,7 @@ export type FinalizeAppliedAssignmentInput = {
   jobTitle?: string | null;
   selectedApplicationId: string;
   selectedNurseUserId: string;
+  patientUserId?: string | null;
   actorId?: string | null;
   actorRole?: string | null;
 };
@@ -83,7 +84,8 @@ export async function finalizeAppliedAssignment(
     applications: appliedApplications ?? [],
     jobId: input.jobId,
     jobTitle: input.jobTitle,
-    selectedNurseUserId: input.selectedNurseUserId
+    selectedNurseUserId: input.selectedNurseUserId,
+    patientUserId: input.patientUserId
   });
 
   if (!assignmentPlan.selectedApplication || !assignmentPlan.selectedApplicationSelectable) {

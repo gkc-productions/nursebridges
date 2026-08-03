@@ -74,6 +74,23 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 
   const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
   const nurseProfileMap = new Map((nurseProfiles ?? []).map((profile) => [profile.nurse_id, profile]));
+  const identityLabels = new Map<string, string>();
+  await Promise.all(profileIds.map(async (profileId) => {
+    const profile = profileMap.get(profileId);
+    if (profile?.full_name) {
+      identityLabels.set(profileId, profile.full_name);
+      return;
+    }
+    const { data } = await supabaseAdmin.auth.admin.getUserById(profileId);
+    if (data?.user?.email) identityLabels.set(profileId, data.user.email);
+  }));
+
+  const { data: auditEvents } = await supabaseAdmin
+    .from("admin_audit_logs")
+    .select("id,action,actor_id,created_at")
+    .eq("entity_type", "job")
+    .eq("entity_id", job.id)
+    .order("created_at", { ascending: true });
 
   return adminJson(request, {
     job: {
@@ -85,8 +102,8 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       start_time: job.start_time ?? null,
       hourly_rate: job.hourly_rate ?? null,
       created_at: job.created_at,
-      patient_name: profileMap.get(job.patient_user_id ?? "")?.full_name ?? null,
-      nurse_name: nurseId ? profileMap.get(nurseId)?.full_name ?? null : null
+      patient_name: identityLabels.get(job.patient_user_id ?? "") ?? null,
+      nurse_name: nurseId ? identityLabels.get(nurseId) ?? null : null
     },
     applications: (applications ?? []).map((application) => {
       const row = application as ApplicationRow;
@@ -95,13 +112,18 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       return {
         job_id: row.job_id,
         nurse_user_id: row.nurse_user_id,
-        nurse_name: profile?.full_name ?? null,
+        nurse_name: identityLabels.get(row.nurse_user_id) ?? null,
         status: row.status,
         verification_status: nurseProfile?.verification_status ?? "pending",
         created_at: row.created_at
       };
     }),
-    events: []
+    events: (auditEvents ?? []).map((event) => ({
+      id: event.id,
+      type: event.action,
+      created_at: event.created_at,
+      actor_name: identityLabels.get(event.actor_id ?? "") ?? "Admin"
+    }))
   });
 }
 
