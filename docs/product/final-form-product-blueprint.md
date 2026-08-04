@@ -72,6 +72,41 @@ Migration is incremental. Do not create both final apps in one change.
 7. Use calm motion, native controls, accessible contrast, and large targets.
 8. Keep support diagnostics available, but outside the normal experience.
 
+## Entry and Onboarding
+
+The first launch must not assume that every person already has credentials. It must present two equally clear entry paths:
+
+```text
+Get started | Sign in
+```
+
+### Patient and Family Entry
+
+`Get started` opens a short eligibility and access flow rather than the credential form:
+
+1. Choose `I have an invitation` or `Request early access`.
+2. Invitation holders verify the invited email or phone number and continue account setup.
+3. Early-access requests collect only name, contact method, general service area, and consent to be contacted.
+4. Do not collect care details, diagnoses, documents, payment details, or other sensitive information before an account is approved and protected.
+5. Show a clear submitted state, expected response window, and support path.
+
+`Sign in` remains a direct path for returning patients and family members. It must include account recovery and must remain usable with the keyboard open.
+
+Public self-registration is not enabled until the enrollment API, abuse controls, consent records, privacy copy, and operator queue are implemented and verified. During closed beta, approval or invitation precedes account activation.
+
+### Nurse Entry
+
+Nurse enrollment exists only in NurseBridges Care:
+
+1. Create or recover a NurseBridges Care account.
+2. Verify contact and identity in progressive steps.
+3. Submit required credentials and consents.
+4. Preserve progress between sessions.
+5. Show review status, missing items, rejection reasons, and support options.
+6. Do not expose opportunities or assigned care until the required approval gate passes.
+
+This separation follows the proven service-marketplace pattern: lightweight customer registration, a distinct provider application, progressive verification, resumable onboarding, and explicit activation gates.
+
 ## Theme and Brand Rules
 
 - The complete Patient and Nurse interfaces support light, dark, and system appearance.
@@ -149,3 +184,18 @@ Do not start the next milestone until the current milestone has:
 - a recoverable Git checkpoint;
 - a short record of remaining limitations.
 
+## TestFlight Release Gate
+
+The Patient and Nurse products ship as separate TestFlight apps and are never uploaded from a partial design checkpoint.
+
+Before uploading either app:
+
+- the product-specific bundle identifier and App Store Connect record are verified;
+- Release configuration, signing, entitlements, privacy metadata, icon, launch assets, and version/build number are verified;
+- automated tests and an Archive build pass;
+- the critical role-specific workflow passes on a physical iPhone;
+- secrets and generated output are absent from the committed release tree;
+- release notes identify tested behavior and remaining beta limitations;
+- the exact release commit is pushed without force and the uploaded build is traceable to it.
+
+Patient and Nurse builds may advance independently. A ready Patient build must not be delayed by an unfinished Nurse build, and an unfinished Nurse build must never be disguised as the Patient product.
