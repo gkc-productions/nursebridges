@@ -22,6 +22,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { apiFetch, apiPublicFetch, formatApiErrorMessage } from "./src/api";
 import { loadApiConfig } from "./src/env";
 import {
+  getNurseWorkspaceTitle,
+  NURSE_WORKSPACE_TABS,
+  type NurseWorkspaceTab
+} from "./src/nurseNavigation";
+import {
   buildPatientAccessRequestPayload,
   emptyPatientAccessForm,
   type PatientAccessForm
@@ -75,12 +80,14 @@ import {
 } from "./src/workflow";
 
 type PatientTab = "home" | "new" | "records" | "updates" | "account";
-type NurseTab = "home" | "open" | "work" | "verification" | "updates" | "account";
+type NurseTab = NurseWorkspaceTab;
 type EntryScreen = "welcome" | "start" | "signin" | "access" | "submitted";
 type RequestStep = 1 | 2 | 3;
 
 let colors: ThemeColors = lightColors;
 let styles = createStyles(colors);
+const patientBrandMark = require("./assets/brand/nursebridge-mark.png");
+const nurseBrandMark = require("../nurse/assets/brand/nursebridges-care-mark.png");
 
 function getUploadErrorMessage(message: string | undefined) {
   const text = message ?? "";
@@ -559,34 +566,152 @@ function PatientQuickActions({
 
 function NurseTabBar({
   activeTab,
-  onChange
+  onChange,
+  unreadCount
 }: {
   activeTab: NurseTab;
   onChange: (tab: NurseTab) => void;
+  unreadCount: number;
 }) {
-  const tabs: Array<{ key: NurseTab; label: string }> = [
-    { key: "home", label: "Home" },
-    { key: "open", label: "Open Requests" },
-    { key: "work", label: "My Work" },
-    { key: "verification", label: "Verification" },
-    { key: "updates", label: "Updates" },
-    { key: "account", label: "Account" }
-  ];
-
   return (
-    <View style={styles.tabBar}>
-      {tabs.map((tab) => {
+    <View style={styles.nurseTabBar}>
+      {NURSE_WORKSPACE_TABS.map((tab) => {
         const isActive = activeTab === tab.key;
         return (
           <TouchableOpacity
             key={tab.key}
-            style={[styles.tabButton, isActive ? styles.tabButtonActive : null]}
+            accessibilityRole="tab"
+            accessibilityLabel={tab.label}
+            accessibilityState={{ selected: isActive }}
+            style={styles.nurseTabButton}
             onPress={() => onChange(tab.key)}
           >
-            <Text style={[styles.tabButtonText, isActive ? styles.tabButtonTextActive : null]}>{tab.label}</Text>
+            <View style={styles.nurseTabIconWrap}>
+              <Ionicons
+                name={isActive ? tab.activeIcon : tab.icon}
+                size={21}
+                style={[styles.nurseTabIcon, isActive ? styles.nurseTabIconActive : null]}
+              />
+              {tab.key === "inbox" && unreadCount > 0 ? (
+                <View style={styles.nurseTabBadge}>
+                  <Text style={styles.nurseTabBadgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={[styles.nurseTabLabel, isActive ? styles.nurseTabLabelActive : null]}>{tab.label}</Text>
           </TouchableOpacity>
         );
       })}
+    </View>
+  );
+}
+
+function NurseWorkspaceHeader({
+  activeTab,
+  isApproved,
+  availableCount,
+  assignmentCount,
+  unreadCount
+}: {
+  activeTab: NurseTab;
+  isApproved: boolean;
+  availableCount: number;
+  assignmentCount: number;
+  unreadCount: number;
+}) {
+  const context =
+    activeTab === "home"
+      ? isApproved
+        ? `${availableCount} opportunities available`
+        : "Verification required before applying"
+      : activeTab === "find"
+        ? `${availableCount} open opportunities`
+        : activeTab === "schedule"
+          ? `${assignmentCount} ${assignmentCount === 1 ? "assignment" : "assignments"}`
+          : activeTab === "inbox"
+            ? unreadCount > 0
+              ? `${unreadCount} unread ${unreadCount === 1 ? "update" : "updates"}`
+              : "You’re all caught up"
+            : isApproved
+              ? "Credentials approved"
+              : "Credentials under review";
+
+  return (
+    <View style={styles.nurseWorkspaceHeader}>
+      <View style={styles.nurseWorkspaceBrandRow}>
+        <View style={styles.nurseWorkspaceIdentity}>
+          <View style={styles.nurseWorkspaceLogoWrap}>
+            <Image source={nurseBrandMark} style={styles.nurseWorkspaceLogo} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.nurseWorkspaceBrand}>NurseBridges Care</Text>
+            <Text style={styles.nurseWorkspaceCaption}>Professional workspace</Text>
+          </View>
+        </View>
+        <View style={[styles.nurseReadinessPill, !isApproved ? styles.nurseReadinessPillPending : null]}>
+          <View style={[styles.nurseReadinessDot, !isApproved ? styles.nurseReadinessDotPending : null]} />
+          <Text style={[styles.nurseReadinessText, !isApproved ? styles.nurseReadinessTextPending : null]}>
+            {isApproved ? "Ready" : "Review"}
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.nurseWorkspaceTitle}>{getNurseWorkspaceTitle(activeTab)}</Text>
+      <Text style={styles.nurseWorkspaceContext}>{context}</Text>
+    </View>
+  );
+}
+
+function NurseHomeOverview({
+  availableCount,
+  assignmentCount,
+  unreadCount,
+  onFindWork,
+  onSchedule,
+  onInbox
+}: {
+  availableCount: number;
+  assignmentCount: number;
+  unreadCount: number;
+  onFindWork: () => void;
+  onSchedule: () => void;
+  onInbox: () => void;
+}) {
+  const actions = [
+    { label: "Find work", value: availableCount, icon: "search-outline", onPress: onFindWork },
+    { label: "Schedule", value: assignmentCount, icon: "calendar-outline", onPress: onSchedule },
+    { label: "Inbox", value: unreadCount, icon: "chatbubble-ellipses-outline", onPress: onInbox }
+  ];
+
+  return (
+    <View style={styles.nurseOverviewSection}>
+      <View style={styles.nurseSectionHeading}>
+        <View>
+          <Text style={styles.eyebrow}>Today</Text>
+          <Text style={styles.nurseSectionTitle}>Work at a glance</Text>
+        </View>
+        <Text style={styles.nurseSectionMeta}>Live</Text>
+      </View>
+      <View style={styles.nurseOverviewGrid}>
+        {actions.map((action) => (
+          <TouchableOpacity
+            key={action.label}
+            accessibilityRole="button"
+            accessibilityLabel={`${action.label}, ${action.value}`}
+            style={styles.nurseOverviewCard}
+            onPress={action.onPress}
+          >
+            <View style={styles.nurseOverviewIcon}>
+              <Ionicons
+                name={action.icon as React.ComponentProps<typeof Ionicons>["name"]}
+                size={19}
+                color={colors.accentDark}
+              />
+            </View>
+            <Text style={styles.nurseOverviewValue}>{action.value}</Text>
+            <Text style={styles.nurseOverviewLabel}>{action.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </View>
   );
 }
@@ -1330,7 +1455,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
       });
 
       setSelectedJob(job);
-      setNurseTab("work");
+      setNurseTab("schedule");
       setNotice("Application submitted.");
       await loadNurseJobs();
     } catch (err) {
@@ -1401,7 +1526,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
     return (
       <SafeAreaView style={styles.centered}>
         <Animated.View style={[styles.splashMark, { opacity: splashOpacity, transform: [{ scale: splashScale }] }]}>
-          <Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.splashImage} />
+          <Image source={isNurseProduct ? nurseBrandMark : patientBrandMark} style={styles.splashImage} />
         </Animated.View>
         <Text style={styles.splashName}>{isNurseProduct ? "NurseBridges Care" : "NurseBridges"}</Text>
         <Text style={styles.meta}>{isNurseProduct ? "Your workday, connected." : "Care is on the way."}</Text>
@@ -1421,7 +1546,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.productGate}>
-          <Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.productGateLogo} />
+          <Image source={isNurseProduct ? nurseBrandMark : patientBrandMark} style={styles.productGateLogo} />
           <Text style={styles.eyebrow}>Account destination</Text>
           <Text style={styles.productGateTitle}>
             You’re signed in to the {isNurseProduct ? "Care" : "Patient"} app
@@ -1451,7 +1576,11 @@ export default function App({ product = "patient" }: { product?: MobileProductId
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView
         ref={scrollViewRef}
-        contentContainerStyle={[styles.content, session && role === "patient" ? styles.patientContent : null]}
+        contentContainerStyle={[
+          styles.content,
+          session && role === "patient" ? styles.patientContent : null,
+          session && role === "nurse" ? styles.nurseContent : null
+        ]}
         automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
@@ -1462,7 +1591,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
           <View style={styles.loginShell}>
             <View style={styles.loginHero}>
               <View style={styles.loginTopRow}>
-                <Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.loginLogo} />
+                <Image source={isNurseProduct ? nurseBrandMark : patientBrandMark} style={styles.loginLogo} />
               </View>
               <Text style={styles.loginBrandName}>{isNurseProduct ? "NurseBridges Care" : "NurseBridges"}</Text>
               <Text style={styles.loginHeroTitle}>
@@ -1730,38 +1859,40 @@ export default function App({ product = "patient" }: { product?: MobileProductId
             ) : null}
           </View>
         ) : null}
-        {session ? <View style={styles.headerPanel}>
-          <View style={styles.brandRow}>
-            <View style={styles.brandIdentity}>
-              <View style={styles.headerLogoWrap}><Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.headerLogo} /></View>
-              <View>
-                <Text style={styles.brandName}>{isNurseProduct ? "NurseBridges Care" : "NurseBridges"}</Text>
-                <Text style={styles.brandCaption}>
-                  {isNurseProduct ? "Professional care workspace." : "Care, connected."}
-                </Text>
+        {session && role === "nurse" ? (
+          <NurseWorkspaceHeader
+            activeTab={nurseTab}
+            isApproved={isApprovedNurse}
+            availableCount={nurseOpenRequests.length}
+            assignmentCount={assignedNurseJobs}
+            unreadCount={unreadNotificationCount}
+          />
+        ) : session ? (
+          <View style={styles.headerPanel}>
+            <View style={styles.brandRow}>
+              <View style={styles.brandIdentity}>
+                <View style={styles.headerLogoWrap}><Image source={patientBrandMark} style={styles.headerLogo} /></View>
+                <View>
+                  <Text style={styles.brandName}>NurseBridges</Text>
+                  <Text style={styles.brandCaption}>Care, connected.</Text>
+                </View>
               </View>
             </View>
-          </View>
-          <Text style={styles.title}>
-            {isNurseProduct ? "Your care work," : "Your care,"}{"\u00A0"}in one place
-          </Text>
-          <Text style={styles.subTitle}>
-            {isNurseProduct
-              ? "Review opportunities, manage assignments, and stay ready for what comes next."
-              : "Request support and see what is happening next."}
-          </Text>
-          <View style={styles.headerStatusRow}>
-            <View style={styles.headerStatusCopy}>
-              <Text style={styles.headerStatusLabel}>Current status</Text>
-              <Text style={styles.headerStatusValue}>{workflowSnapshot.status}</Text>
+            <Text style={styles.title}>Your care,{"\u00A0"}in one place</Text>
+            <Text style={styles.subTitle}>Request support and see what is happening next.</Text>
+            <View style={styles.headerStatusRow}>
+              <View style={styles.headerStatusCopy}>
+                <Text style={styles.headerStatusLabel}>Current status</Text>
+                <Text style={styles.headerStatusValue}>{workflowSnapshot.status}</Text>
+              </View>
+              {unreadNotificationCount > 0 ? (
+                <TouchableOpacity accessibilityRole="button" onPress={() => setPatientTab("updates")}>
+                  <Text style={styles.headerMeta}>{unreadNotificationCount} new</Text>
+                </TouchableOpacity>
+              ) : <Text style={styles.headerMeta}>Up to date</Text>}
             </View>
-            {unreadNotificationCount > 0 ? (
-              <TouchableOpacity accessibilityRole="button" onPress={() => setPatientTab("updates")}>
-                <Text style={styles.headerMeta}>{unreadNotificationCount} new</Text>
-              </TouchableOpacity>
-            ) : <Text style={styles.headerMeta}>Up to date</Text>}
           </View>
-        </View> : null}
+        ) : null}
 
         {session && error ? <ErrorNotice message={error} onCopy={copyErrorDetails} /> : null}
         {session && notice ? <Text style={styles.notice}>{notice}</Text> : null}
@@ -1789,8 +1920,6 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                 <Text style={styles.emptyText}>Loading latest workflow data...</Text>
               </View>
             ) : null}
-
-            {role === "nurse" ? <NurseTabBar activeTab={nurseTab} onChange={setNurseTab} /> : null}
 
             {role === "patient" && patientTab === "home" ? (
               <>
@@ -1848,6 +1977,15 @@ export default function App({ product = "patient" }: { product?: MobileProductId
             ) : null}
 
             {role === "nurse" && nurseTab === "home" ? (
+              <>
+              <NurseHomeOverview
+                availableCount={isApprovedNurse ? nurseOpenRequests.length : 0}
+                assignmentCount={assignedNurseJobs}
+                unreadCount={unreadNotificationCount}
+                onFindWork={() => setNurseTab("find")}
+                onSchedule={() => setNurseTab("schedule")}
+                onInbox={() => setNurseTab("inbox")}
+              />
               <NextActionPanel
                 eyebrow="Nurse next action"
                 title={
@@ -1882,16 +2020,17 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                 secondaryLabel={!isApprovedNurse ? "Choose document" : nurseFocusJob ? "View details" : "Refresh"}
                 onSecondary={
                   !isApprovedNurse
-                    ? () => setNurseTab("verification")
+                    ? () => setNurseTab("account")
                     : nurseFocusJob
                       ? () => {
                           setSelectedJob(nurseFocusJob);
-                          setNurseTab(nurseFocusJob.assigned_nurse_user_id === session.user.id ? "work" : "open");
+                          setNurseTab(nurseFocusJob.assigned_nurse_user_id === session.user.id ? "schedule" : "find");
                         }
                       : loadNurseJobs
                 }
                 disabled={actionLoading || screenLoading}
               />
+              </>
             ) : null}
 
             {role === "admin" ? (
@@ -1903,7 +2042,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
               />
             ) : null}
 
-            {role === "admin" || (role === "patient" && patientTab === "updates") || (role === "nurse" && nurseTab === "updates") ? (
+            {role === "admin" || (role === "patient" && patientTab === "updates") || (role === "nurse" && nurseTab === "inbox") ? (
               <View style={styles.card}>
                 <SectionHeader
                   eyebrow="Updates"
@@ -2149,11 +2288,11 @@ export default function App({ product = "patient" }: { product?: MobileProductId
               </>
             ) : null}
 
-            {role === "nurse" && nurseTab === "open" ? (
+            {role === "nurse" && nurseTab === "find" ? (
               <View style={styles.card}>
                 <SectionHeader
                   eyebrow="Nurse workflow"
-                  title="Open requests"
+                  title="Find work"
                   actionLabel="Refresh"
                   onAction={loadNurseJobs}
                   disabled={screenLoading || actionLoading}
@@ -2203,11 +2342,11 @@ export default function App({ product = "patient" }: { product?: MobileProductId
               </View>
             ) : null}
 
-            {role === "nurse" && nurseTab === "work" ? (
+            {role === "nurse" && nurseTab === "schedule" ? (
               <View style={styles.card}>
                 <SectionHeader
                   eyebrow="Nurse workflow"
-                  title="My work"
+                  title="Schedule"
                   actionLabel="Refresh"
                   onAction={loadNurseJobs}
                   disabled={screenLoading || actionLoading}
@@ -2252,7 +2391,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
               </View>
             ) : null}
 
-            {role === "nurse" && nurseTab === "verification" ? (
+            {role === "nurse" && nurseTab === "account" ? (
               <View style={styles.card}>
                 <SectionHeader
                   eyebrow="Credentialing"
@@ -2296,7 +2435,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
               </View>
             ) : null}
 
-            {role === "nurse" && (nurseTab === "open" || nurseTab === "work") && selectedJob && nurseRequestDetail ? (
+            {role === "nurse" && (nurseTab === "find" || nurseTab === "schedule") && selectedJob && nurseRequestDetail ? (
               <RequestDetailPanel
                 eyebrow="Selected request"
                 title={nurseRequestDetail.title}
@@ -2357,6 +2496,9 @@ export default function App({ product = "patient" }: { product?: MobileProductId
         )}
       </ScrollView>
       {session && role === "patient" ? <PatientTabBar activeTab={patientTab} onChange={setPatientTab} /> : null}
+      {session && role === "nurse" ? (
+        <NurseTabBar activeTab={nurseTab} onChange={setNurseTab} unreadCount={unreadNotificationCount} />
+      ) : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -2386,6 +2528,61 @@ return StyleSheet.create({
   patientContent: {
     paddingBottom: 110
   },
+  nurseContent: {
+    paddingBottom: 110
+  },
+  nurseWorkspaceHeader: {
+    backgroundColor: colors.hero,
+    borderRadius: 24,
+    marginBottom: 14,
+    padding: 17,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16
+  },
+  nurseWorkspaceBrandRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 19
+  },
+  nurseWorkspaceIdentity: { alignItems: "center", flexDirection: "row", flex: 1, gap: 11 },
+  nurseWorkspaceLogoWrap: {
+    alignItems: "center",
+    backgroundColor: "#E9FFFA",
+    borderRadius: 14,
+    height: 46,
+    justifyContent: "center",
+    overflow: "hidden",
+    width: 46
+  },
+  nurseWorkspaceLogo: { height: 42, resizeMode: "contain", width: 42 },
+  nurseWorkspaceBrand: { color: colors.heroText, fontSize: 16, fontWeight: "900", letterSpacing: -0.3 },
+  nurseWorkspaceCaption: { color: colors.heroMuted, fontSize: 11, fontWeight: "700", marginTop: 2 },
+  nurseWorkspaceTitle: {
+    color: colors.heroText,
+    fontSize: 27,
+    fontWeight: "900",
+    letterSpacing: -0.9,
+    lineHeight: 32,
+    marginBottom: 5
+  },
+  nurseWorkspaceContext: { color: colors.heroMuted, fontSize: 13, fontWeight: "600", lineHeight: 18 },
+  nurseReadinessPill: {
+    alignItems: "center",
+    backgroundColor: colors.successMuted,
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7
+  },
+  nurseReadinessPillPending: { backgroundColor: colors.warningMuted },
+  nurseReadinessDot: { backgroundColor: colors.success, borderRadius: 4, height: 7, width: 7 },
+  nurseReadinessDotPending: { backgroundColor: colors.warning },
+  nurseReadinessText: { color: colors.success, fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
+  nurseReadinessTextPending: { color: colors.warning },
   headerPanel: {
     backgroundColor: colors.hero,
     borderRadius: 28,
@@ -2765,6 +2962,80 @@ return StyleSheet.create({
   patientTabIconActive: { color: colors.accent },
   patientTabLabel: { color: colors.muted, fontSize: 9, fontWeight: "700", marginTop: 2 },
   patientTabLabelActive: { color: colors.accent, fontWeight: "900" },
+  nurseTabBar: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 24,
+    borderWidth: 1,
+    flexDirection: "row",
+    marginBottom: 8,
+    marginHorizontal: 12,
+    paddingHorizontal: 5,
+    paddingVertical: 7,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16
+  },
+  nurseTabButton: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 52,
+    paddingHorizontal: 1,
+    paddingVertical: 4
+  },
+  nurseTabIconWrap: { alignItems: "center", justifyContent: "center", minHeight: 22, minWidth: 29 },
+  nurseTabIcon: { color: colors.mutedSoft },
+  nurseTabIconActive: { color: colors.accent },
+  nurseTabLabel: { color: colors.muted, fontSize: 8.5, fontWeight: "700", marginTop: 2, textAlign: "center" },
+  nurseTabLabelActive: { color: colors.accent, fontWeight: "900" },
+  nurseTabBadge: {
+    alignItems: "center",
+    backgroundColor: colors.danger,
+    borderColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 2,
+    height: 16,
+    justifyContent: "center",
+    minWidth: 16,
+    paddingHorizontal: 3,
+    position: "absolute",
+    right: -4,
+    top: -5
+  },
+  nurseTabBadgeText: { color: "#FFFFFF", fontSize: 8, fontWeight: "900" },
+  nurseOverviewSection: { marginBottom: 14 },
+  nurseSectionHeading: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 11,
+    paddingHorizontal: 2
+  },
+  nurseSectionTitle: { color: colors.ink, fontSize: 21, fontWeight: "900", letterSpacing: -0.6, marginTop: 2 },
+  nurseSectionMeta: { color: colors.success, fontSize: 11, fontWeight: "900", marginBottom: 2, textTransform: "uppercase" },
+  nurseOverviewGrid: { flexDirection: "row", gap: 9 },
+  nurseOverviewCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 112,
+    padding: 12
+  },
+  nurseOverviewIcon: {
+    alignItems: "center",
+    backgroundColor: colors.accentMuted,
+    borderRadius: 11,
+    height: 32,
+    justifyContent: "center",
+    marginBottom: 10,
+    width: 32
+  },
+  nurseOverviewValue: { color: colors.ink, fontSize: 21, fontWeight: "900", letterSpacing: -0.5 },
+  nurseOverviewLabel: { color: colors.muted, fontSize: 10, fontWeight: "800", marginTop: 2 },
   quickActionsSection: { marginBottom: 16 },
   homeSectionTitle: { color: colors.ink, fontSize: 19, fontWeight: "900", letterSpacing: -0.4, marginBottom: 12 },
   quickActionsGrid: { flexDirection: "row", gap: 9 },

@@ -7,7 +7,7 @@
     "dev": "expo start",
     "lint": "echo \"(add eslint later)\"",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test test/workflow.test.ts test/api.test.ts test/product.test.ts test/theme.test.ts test/onboarding.test.ts",
+    "test": "node --import tsx --test test/workflow.test.ts test/api.test.ts test/product.test.ts test/theme.test.ts test/onboarding.test.ts test/nurseNavigation.test.ts",
     "ios:repair": "node scripts/repair-ios-native-project.mjs",
     "ios:release-check": "node scripts/verify-ios-release-readiness.mjs",
     "ios:install-preflight": "node scripts/verify-ios-install-preflight.mjs",
