@@ -14,7 +14,7 @@ type JobRow = {
   id: string;
   status: string;
   patient_user_id: string | null;
-  assigned_nurse_user_id: string | null;
+  assigned_nurse_user_id?: string | null;
   title: string;
   description: string | null;
   address: string | null;
@@ -114,7 +114,7 @@ export async function jobRoutes(app: FastifyInstance) {
 
     let query = sb
       .from("jobs")
-      .select("id,status,patient_user_id,assigned_nurse_user_id,title,description,address,start_time,hourly_rate,created_at");
+      .select("id,status,patient_user_id,title,description,address,start_time,hourly_rate,created_at");
 
     if (authed.role === "patient") {
       query = query.eq("patient_user_id", authed.userId);
@@ -151,7 +151,7 @@ export async function jobRoutes(app: FastifyInstance) {
 
     const { data: job, error } = await sb
       .from("jobs")
-      .select("id,status,patient_user_id,assigned_nurse_user_id,title,description,address,start_time,hourly_rate,created_at")
+      .select("id,status,patient_user_id,title,description,address,start_time,hourly_rate,created_at")
       .eq("id", jobId)
       .single();
 

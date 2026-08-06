@@ -1,6 +1,6 @@
 export type AssignmentViewJob = {
   id: string;
-  assigned_nurse_user_id: string | null;
+  assigned_nurse_user_id?: string | null;
 };
 
 export type AcceptedApplication = {
