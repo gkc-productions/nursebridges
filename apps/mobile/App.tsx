@@ -79,6 +79,7 @@ import {
 type PatientTab = "home" | "new" | "records" | "updates" | "account";
 type NurseTab = "home" | "open" | "work" | "verification" | "updates" | "account";
 type EntryScreen = "welcome" | "start" | "signin" | "access" | "submitted";
+type RequestStep = 1 | 2 | 3;
 
 const THEME_STORAGE_KEY = "nursebridges.theme";
 
@@ -635,6 +636,29 @@ function SectionHeader({
   );
 }
 
+function RequestProgress({ step }: { step: RequestStep }) {
+  const labels = ["Need", "Schedule", "Review"];
+  return (
+    <View style={styles.requestProgress} accessibilityLabel={`Care request step ${step} of 3`}>
+      {labels.map((label, index) => {
+        const position = (index + 1) as RequestStep;
+        const isComplete = position < step;
+        const isCurrent = position === step;
+        return (
+          <View key={label} style={styles.requestProgressItem}>
+            <View style={[styles.requestProgressDot, isComplete || isCurrent ? styles.requestProgressDotActive : null]}>
+              <Text style={[styles.requestProgressNumber, isComplete || isCurrent ? styles.requestProgressNumberActive : null]}>
+                {isComplete ? "✓" : position}
+              </Text>
+            </View>
+            <Text style={[styles.requestProgressLabel, isCurrent ? styles.requestProgressLabelActive : null]}>{label}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function App() {
   const systemScheme = useColorScheme();
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => resolveThemeMode(systemScheme));
@@ -657,6 +681,7 @@ export default function App() {
   const [entryScreen, setEntryScreen] = useState<EntryScreen>("welcome");
   const [accessForm, setAccessForm] = useState<PatientAccessForm>(emptyPatientAccessForm);
   const [patientTab, setPatientTab] = useState<PatientTab>("home");
+  const [requestStep, setRequestStep] = useState<RequestStep>(1);
   const [nurseTab, setNurseTab] = useState<NurseTab>("home");
 
   const [patientJobs, setPatientJobs] = useState<JobRow[]>([]);
@@ -1250,6 +1275,7 @@ export default function App() {
       });
 
       setJobForm(emptyJobForm);
+      setRequestStep(1);
       setPatientTab("home");
       setNotice("Care request submitted.");
       await loadPatientJobs();
@@ -1871,71 +1897,139 @@ export default function App() {
                 ) : null}
 
                 {patientTab === "new" ? (
-                  <View style={styles.card}>
-                    <SectionHeader eyebrow="Patient workflow" title="Request care support" />
-                    <Text style={styles.sectionIntro}>
-                      Submit only the details needed for closed-beta review, assignment, and follow-up. This is not an emergency service or a full medical chart.
-                    </Text>
-                    <Text style={styles.inputLabel}>Support type or request title *</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Appointment support, check-in, post-surgery help"
-                      value={jobForm.title}
-                      onChangeText={(text) => setJobForm((prev) => ({ ...prev, title: text }))}
-                    />
-                    <Text style={styles.inputLabel}>Care details</Text>
-                    <TextInput
-                      style={[styles.input, styles.multilineInput]}
-                      placeholder="Care need, appointment context, or family notes"
-                      multiline
-                      value={jobForm.description}
-                      onChangeText={(text) => setJobForm((prev) => ({ ...prev, description: text }))}
-                    />
-                    <Text style={styles.inputLabel}>Contact context</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Who should be contacted or met during this request"
-                      value={jobForm.contact_context}
-                      onChangeText={(text) => setJobForm((prev) => ({ ...prev, contact_context: text }))}
-                    />
-                    <Text style={styles.inputLabel}>Mobility/support notes</Text>
-                    <TextInput
-                      style={[styles.input, styles.multilineInput]}
-                      placeholder="Walker, wheelchair, stairs, transfer support, or other practical notes"
-                      multiline
-                      value={jobForm.mobility_notes}
-                      onChangeText={(text) => setJobForm((prev) => ({ ...prev, mobility_notes: text }))}
-                    />
-                    <Text style={styles.inputLabel}>Location</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Service address or meeting location"
-                      value={jobForm.address}
-                      onChangeText={(text) => setJobForm((prev) => ({ ...prev, address: text }))}
-                    />
-                    <Text style={styles.inputLabel}>Requested date/time</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="2026-08-05 10:00 AM"
-                      autoCapitalize="none"
-                      value={jobForm.start_time}
-                      onChangeText={(text) => setJobForm((prev) => ({ ...prev, start_time: text }))}
-                    />
-                    <Text style={styles.inputLabel}>Hourly rate, if used in this beta</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Optional hourly rate"
-                      keyboardType="numeric"
-                      value={jobForm.hourly_rate}
-                      onChangeText={(text) => setJobForm((prev) => ({ ...prev, hourly_rate: text }))}
-                    />
-                    <TouchableOpacity style={styles.button} onPress={handleCreateJob} disabled={actionLoading}>
-                      {actionLoading ? (
-                        <ActivityIndicator color="#FFFFFF" />
+                  <View style={styles.requestCard}>
+                    <Text style={styles.eyebrow}>Request care</Text>
+                    <Text style={styles.requestTitle}>Let’s get the right support</Text>
+                    <Text style={styles.sectionIntro}>A few clear details help the care team review your request.</Text>
+                    <RequestProgress step={requestStep} />
+
+                    {requestStep === 1 ? (
+                      <View>
+                        <Text style={styles.requestStepTitle}>What do you need help with?</Text>
+                        <Text style={styles.inputLabel}>Support type *</Text>
+                        <TextInput
+                          accessibilityLabel="Support type"
+                          style={styles.input}
+                          placeholder="Appointment support, check-in, recovery help"
+                          placeholderTextColor={colors.mutedSoft}
+                          value={jobForm.title}
+                          onChangeText={(text) => setJobForm((prev) => ({ ...prev, title: text }))}
+                        />
+                        <Text style={styles.inputLabel}>Anything else we should know?</Text>
+                        <TextInput
+                          accessibilityLabel="Care request details"
+                          style={[styles.input, styles.multilineInput]}
+                          placeholder="Share only the practical details needed to coordinate support"
+                          placeholderTextColor={colors.mutedSoft}
+                          multiline
+                          value={jobForm.description}
+                          onChangeText={(text) => setJobForm((prev) => ({ ...prev, description: text }))}
+                        />
+                        <Text style={styles.formPrivacyNote}>Do not include diagnoses, insurance numbers, or a full medical history.</Text>
+                      </View>
+                    ) : null}
+
+                    {requestStep === 2 ? (
+                      <View>
+                        <Text style={styles.requestStepTitle}>Where and when?</Text>
+                        <Text style={styles.inputLabel}>Location</Text>
+                        <TextInput
+                          accessibilityLabel="Care request location"
+                          style={styles.input}
+                          placeholder="Service address or meeting location"
+                          placeholderTextColor={colors.mutedSoft}
+                          value={jobForm.address}
+                          onChangeText={(text) => setJobForm((prev) => ({ ...prev, address: text }))}
+                        />
+                        <Text style={styles.inputLabel}>Requested date and time</Text>
+                        <TextInput
+                          accessibilityLabel="Requested date and time"
+                          style={styles.input}
+                          placeholder="Example: 2026-08-05 10:00 AM"
+                          placeholderTextColor={colors.mutedSoft}
+                          autoCapitalize="none"
+                          value={jobForm.start_time}
+                          onChangeText={(text) => setJobForm((prev) => ({ ...prev, start_time: text }))}
+                        />
+                        <Text style={styles.inputLabel}>Hourly rate (optional)</Text>
+                        <TextInput
+                          accessibilityLabel="Optional hourly rate"
+                          style={styles.input}
+                          placeholder="Leave blank if not used"
+                          placeholderTextColor={colors.mutedSoft}
+                          keyboardType="numeric"
+                          value={jobForm.hourly_rate}
+                          onChangeText={(text) => setJobForm((prev) => ({ ...prev, hourly_rate: text }))}
+                        />
+                      </View>
+                    ) : null}
+
+                    {requestStep === 3 ? (
+                      <View>
+                        <Text style={styles.requestStepTitle}>Review and add contact details</Text>
+                        <View style={styles.requestReview}>
+                          <Text style={styles.requestReviewTitle}>{jobForm.title.trim() || "Care support request"}</Text>
+                          <Text style={styles.requestReviewMeta}>{jobForm.address.trim() || "Location to be confirmed"}</Text>
+                          <Text style={styles.requestReviewMeta}>{jobForm.start_time.trim() || "Time to be confirmed"}</Text>
+                        </View>
+                        <Text style={styles.inputLabel}>Who should the caregiver contact or meet?</Text>
+                        <TextInput
+                          accessibilityLabel="Care request contact"
+                          style={styles.input}
+                          placeholder="Name and relationship only"
+                          placeholderTextColor={colors.mutedSoft}
+                          value={jobForm.contact_context}
+                          onChangeText={(text) => setJobForm((prev) => ({ ...prev, contact_context: text }))}
+                        />
+                        <Text style={styles.inputLabel}>Mobility or practical support notes</Text>
+                        <TextInput
+                          accessibilityLabel="Mobility and practical support notes"
+                          style={[styles.input, styles.multilineInput]}
+                          placeholder="Stairs, wheelchair access, transfer support, or other practical notes"
+                          placeholderTextColor={colors.mutedSoft}
+                          multiline
+                          value={jobForm.mobility_notes}
+                          onChangeText={(text) => setJobForm((prev) => ({ ...prev, mobility_notes: text }))}
+                        />
+                        <View style={styles.requestSafetyNote}>
+                          <Text style={styles.requestSafetyTitle}>Before you submit</Text>
+                          <Text style={styles.requestSafetyBody}>NurseBridges is not an emergency service. Submitting sends this request to the beta care team for review.</Text>
+                        </View>
+                      </View>
+                    ) : null}
+
+                    <View style={styles.requestFooter}>
+                      {requestStep > 1 ? (
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          style={styles.requestBackButton}
+                          onPress={() => setRequestStep((requestStep - 1) as RequestStep)}
+                          disabled={actionLoading}
+                        >
+                          <Text style={styles.requestBackButtonText}>Back</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                      {requestStep < 3 ? (
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          style={styles.requestContinueButton}
+                          onPress={() => {
+                            if (requestStep === 1 && jobForm.title.trim().length < 3) {
+                              setError("Enter the support type using at least 3 characters.");
+                              return;
+                            }
+                            setError(null);
+                            setRequestStep((requestStep + 1) as RequestStep);
+                          }}
+                        >
+                          <Text style={styles.requestContinueButtonText}>Continue</Text>
+                        </TouchableOpacity>
                       ) : (
-                        <Text style={styles.buttonText}>Submit care request</Text>
+                        <TouchableOpacity style={styles.requestContinueButton} onPress={handleCreateJob} disabled={actionLoading}>
+                          {actionLoading ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.requestContinueButtonText}>Submit request</Text>}
+                        </TouchableOpacity>
                       )}
-                    </TouchableOpacity>
+                    </View>
                   </View>
                 ) : null}
 
@@ -2371,6 +2465,62 @@ return StyleSheet.create({
     padding: 15,
     marginBottom: 12
   },
+  requestCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 26,
+    borderWidth: 1,
+    marginBottom: 12,
+    padding: 20
+  },
+  requestTitle: { color: colors.ink, fontSize: 25, fontWeight: "900", letterSpacing: -0.8, lineHeight: 30, marginBottom: 8 },
+  requestProgress: { flexDirection: "row", justifyContent: "space-between", marginBottom: 26, marginTop: 4 },
+  requestProgressItem: { alignItems: "center", flex: 1 },
+  requestProgressDot: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: "center",
+    marginBottom: 6,
+    width: 32
+  },
+  requestProgressDotActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  requestProgressNumber: { color: colors.muted, fontSize: 12, fontWeight: "900" },
+  requestProgressNumberActive: { color: colors.onAccent },
+  requestProgressLabel: { color: colors.muted, fontSize: 10, fontWeight: "700" },
+  requestProgressLabelActive: { color: colors.accent, fontWeight: "900" },
+  requestStepTitle: { color: colors.ink, fontSize: 19, fontWeight: "900", letterSpacing: -0.4, marginBottom: 18 },
+  formPrivacyNote: { color: colors.muted, fontSize: 11, lineHeight: 16, marginBottom: 4 },
+  requestReview: { backgroundColor: colors.surfaceMuted, borderRadius: 17, marginBottom: 18, padding: 15 },
+  requestReviewTitle: { color: colors.ink, fontSize: 15, fontWeight: "900", marginBottom: 8 },
+  requestReviewMeta: { color: colors.muted, fontSize: 12, lineHeight: 18 },
+  requestSafetyNote: { backgroundColor: colors.accentMuted, borderRadius: 16, marginTop: 2, padding: 14 },
+  requestSafetyTitle: { color: colors.accentDark, fontSize: 12, fontWeight: "900", marginBottom: 5 },
+  requestSafetyBody: { color: colors.inkSoft, fontSize: 11, lineHeight: 16 },
+  requestFooter: { flexDirection: "row", gap: 10, marginTop: 20 },
+  requestBackButton: {
+    alignItems: "center",
+    borderColor: colors.borderStrong,
+    borderRadius: 15,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 54,
+    paddingHorizontal: 18
+  },
+  requestBackButtonText: { color: colors.ink, fontSize: 14, fontWeight: "900" },
+  requestContinueButton: {
+    alignItems: "center",
+    backgroundColor: colors.accent,
+    borderRadius: 15,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 54,
+    paddingHorizontal: 18
+  },
+  requestContinueButtonText: { color: colors.onAccent, fontSize: 15, fontWeight: "900" },
   loginShell: { flex: 1, gap: 16, justifyContent: "center", paddingVertical: 18 },
   loginHero: { backgroundColor: colors.hero, borderRadius: 30, padding: 22 },
   loginTopRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 22 },
