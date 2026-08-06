@@ -3,6 +3,7 @@ import { writeAdminAuditLog } from "../audit.js";
 import { requireAuth, requireRole } from "../auth.js";
 import { createNotification, createNotifications } from "../notifications.js";
 import { supabaseAdmin, supabaseForUser } from "../supabase.js";
+import { buildAssignedNurseMap } from "../jobAssignmentView.js";
 import { registerJobCreateRoute } from "./jobCreateRoute.js";
 import { registerJobApplyRoute } from "./jobApplyRoute.js";
 import { createJobTerminalActions, registerJobTerminalRoutes } from "./jobTerminalRoute.js";
@@ -13,6 +14,7 @@ type JobRow = {
   id: string;
   status: string;
   patient_user_id: string | null;
+  assigned_nurse_user_id: string | null;
   title: string;
   description: string | null;
   address: string | null;
@@ -50,21 +52,21 @@ async function requireVerifiedNurse(userId: string, jwt: string) {
   }
 }
 
-async function fetchAssignedNurseMap(jobIds: string[], jwt: string) {
+async function fetchAssignedNurseMap(jobs: JobRow[], jwt: string) {
+  const jobIds = jobs.map((job) => job.id);
   if (jobIds.length === 0) return { assigned: new Map<string, string>(), names: new Map<string, string>() };
 
-  const sb = supabaseForUser(jwt);
+  // These job IDs have already passed the requesting user's role-aware jobs query.
+  // Use the service client when available so patient RLS on applications does not hide
+  // the accepted nurse from the patient's own care-request response.
+  const sb = supabaseAdmin ?? supabaseForUser(jwt);
   const { data: apps } = await sb
     .from("applications")
     .select("job_id,nurse_user_id,status")
     .in("job_id", jobIds)
     .eq("status", "accepted");
 
-  const assigned = new Map<string, string>();
-  for (const row of apps ?? []) {
-    const app = row as ApplicationRow;
-    if (!assigned.has(app.job_id)) assigned.set(app.job_id, app.nurse_user_id);
-  }
+  const assigned = buildAssignedNurseMap(jobs, (apps ?? []) as ApplicationRow[]);
 
   const nurseIds = Array.from(new Set(Array.from(assigned.values())));
   const names = new Map<string, string>();
@@ -112,7 +114,7 @@ export async function jobRoutes(app: FastifyInstance) {
 
     let query = sb
       .from("jobs")
-      .select("id,status,patient_user_id,title,description,address,start_time,hourly_rate,created_at");
+      .select("id,status,patient_user_id,assigned_nurse_user_id,title,description,address,start_time,hourly_rate,created_at");
 
     if (authed.role === "patient") {
       query = query.eq("patient_user_id", authed.userId);
@@ -127,8 +129,7 @@ export async function jobRoutes(app: FastifyInstance) {
     if (error) return reply.code(400).send({ error: "Unable to load jobs" });
 
     const jobs = (data ?? []) as JobRow[];
-    const jobIds = jobs.map((job) => job.id);
-    const { assigned, names } = await fetchAssignedNurseMap(jobIds, authed.jwt);
+    const { assigned, names } = await fetchAssignedNurseMap(jobs, authed.jwt);
 
     const merged = jobs.map((job) => {
       const nurseId = assigned.get(job.id) ?? null;
@@ -150,13 +151,13 @@ export async function jobRoutes(app: FastifyInstance) {
 
     const { data: job, error } = await sb
       .from("jobs")
-      .select("id,status,patient_user_id,title,description,address,start_time,hourly_rate,created_at")
+      .select("id,status,patient_user_id,assigned_nurse_user_id,title,description,address,start_time,hourly_rate,created_at")
       .eq("id", jobId)
       .single();
 
     if (error || !job) return reply.code(404).send({ error: "Job not found" });
 
-    const { assigned, names } = await fetchAssignedNurseMap([jobId], authed.jwt);
+    const { assigned, names } = await fetchAssignedNurseMap([job as JobRow], authed.jwt);
     const nurseId = assigned.get(jobId) ?? null;
 
     return reply.send({
