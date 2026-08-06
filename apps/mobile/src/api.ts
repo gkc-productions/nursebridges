@@ -76,3 +76,23 @@ export async function apiFetch<T>(
 
   return data as T;
 }
+
+export async function apiPublicFetch<T>(baseUrl: string, path: string, init: RequestInit = {}) {
+  if (!baseUrl) throw new Error("API URL is not configured.");
+
+  const requestId = createRequestId();
+  const headers = new Headers(init.headers);
+  headers.set("x-request-id", requestId);
+  if (init.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const res = await fetch(`${baseUrl}${path}`, { ...init, headers });
+  const data = await readJson<T & ApiErrorResponse>(res);
+
+  if (!res.ok) {
+    throw new ApiRequestError(res.status, data, requestId);
+  }
+
+  return data as T;
+}

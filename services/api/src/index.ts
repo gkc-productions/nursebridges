@@ -10,6 +10,8 @@ import { adminRoutes } from "./routes/admin.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { pushRoutes } from "./routes/push.js";
 import { nurseRoutes } from "./routes/nurse.js";
+import { registerPatientAccessRequestRoute } from "./routes/patientAccessRequestRoute.js";
+import { supabaseAdmin } from "./supabase.js";
 
 const requestStartTimes = new WeakMap<object, number>();
 
@@ -61,6 +63,7 @@ async function main() {
     });
   });
 
+  await registerPatientAccessRequestRoute(app, { supabaseAdmin });
   await meRoutes(app);
   await jobRoutes(app);
   await applicationRoutes(app);

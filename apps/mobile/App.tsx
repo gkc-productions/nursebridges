@@ -20,8 +20,13 @@ import {
   View
 } from "react-native";
 import type { Session } from "@supabase/supabase-js";
-import { apiFetch, formatApiErrorMessage } from "./src/api";
+import { apiFetch, apiPublicFetch, formatApiErrorMessage } from "./src/api";
 import { loadApiConfig } from "./src/env";
+import {
+  buildPatientAccessRequestPayload,
+  emptyPatientAccessForm,
+  type PatientAccessForm
+} from "./src/onboarding";
 import { addForegroundNotificationListener, registerForPushNotificationsAsync } from "./src/push";
 import { canUsePatientProduct, patientProductAccessMessage } from "./src/product";
 import { getSupabaseClient } from "./src/supabase";
@@ -73,6 +78,7 @@ import {
 
 type PatientTab = "home" | "new" | "records" | "updates" | "account";
 type NurseTab = "home" | "open" | "work" | "verification" | "updates" | "account";
+type EntryScreen = "welcome" | "start" | "signin" | "access" | "submitted";
 
 const THEME_STORAGE_KEY = "nursebridges.theme";
 
@@ -601,6 +607,8 @@ export default function App() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [entryScreen, setEntryScreen] = useState<EntryScreen>("welcome");
+  const [accessForm, setAccessForm] = useState<PatientAccessForm>(emptyPatientAccessForm);
   const [patientTab, setPatientTab] = useState<PatientTab>("home");
   const [nurseTab, setNurseTab] = useState<NurseTab>("home");
 
@@ -1131,6 +1139,38 @@ export default function App() {
     }
   }
 
+  function showEntryScreen(nextScreen: EntryScreen) {
+    setError(null);
+    setNotice(null);
+    setEntryScreen(nextScreen);
+  }
+
+  function updateAccessForm<K extends keyof PatientAccessForm>(key: K, value: PatientAccessForm[K]) {
+    setAccessForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function handlePatientAccessRequest() {
+    const request = buildPatientAccessRequestPayload(accessForm);
+    if (!request.ok) {
+      setError(request.error);
+      return;
+    }
+
+    setActionLoading(true);
+    setError(null);
+    try {
+      await apiPublicFetch(baseUrl, "/v1/access-requests/patient", {
+        method: "POST",
+        body: JSON.stringify(request.value)
+      });
+      setEntryScreen("submitted");
+    } catch (err) {
+      setError(formatApiErrorMessage("Unable to send your request right now.", err));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   async function handleSignOut() {
     if (!supabase) {
       setError("Mobile app is missing Supabase configuration.");
@@ -1139,6 +1179,7 @@ export default function App() {
 
     setActionLoading(true);
     await supabase.auth.signOut();
+    setEntryScreen("welcome");
     setActionLoading(false);
   }
 
@@ -1326,52 +1367,240 @@ export default function App() {
                 Request trusted support, follow every update, and keep the people you care about informed.
               </Text>
             </View>
-            <View style={styles.loginCard}>
-              <Text style={styles.eyebrow}>Patient and family access</Text>
-              <Text style={styles.loginTitle}>Welcome back</Text>
-              <Text style={styles.sectionIntro}>Sign in with the account from your NurseBridges invitation.</Text>
-              <Text style={styles.inputLabel}>Email</Text>
-              <TextInput
-                accessibilityLabel="Email address"
-                style={styles.input}
-                placeholder="you@example.com"
-                placeholderTextColor={colors.mutedSoft}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="email"
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                returnKeyType="next"
-                onSubmitEditing={() => passwordInputRef.current?.focus()}
-                value={email}
-                onChangeText={setEmail}
-              />
-              <Text style={styles.inputLabel}>Password</Text>
-              <TextInput
-                ref={passwordInputRef}
-                accessibilityLabel="Password"
-                style={styles.input}
-                placeholder="Your password"
-                placeholderTextColor={colors.mutedSoft}
-                autoComplete="current-password"
-                secureTextEntry
-                textContentType="password"
-                returnKeyType="go"
-                onSubmitEditing={handleSignIn}
-                value={password}
-                onChangeText={setPassword}
-              />
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="Continue securely"
-                style={styles.button}
-                onPress={handleSignIn}
-                disabled={actionLoading}
-              >
-                {actionLoading ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.buttonText}>Continue securely</Text>}
-              </TouchableOpacity>
-              <Text style={styles.loginSafety}>Not for emergencies. For urgent needs, contact local emergency services.</Text>
-            </View>
+            {error ? <ErrorNotice message={error} onCopy={copyErrorDetails} /> : null}
+
+            {entryScreen === "welcome" ? (
+              <View style={styles.loginCard}>
+                <Text style={styles.eyebrow}>Patient and family</Text>
+                <Text style={styles.loginTitle}>Start with what you need</Text>
+                <Text style={styles.sectionIntro}>
+                  Join the closed beta or return to an existing NurseBridges account.
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={styles.entryPrimaryButton}
+                  onPress={() => showEntryScreen("start")}
+                >
+                  <Text style={styles.entryPrimaryButtonText}>Get started</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={styles.entrySecondaryButton}
+                  onPress={() => showEntryScreen("signin")}
+                >
+                  <Text style={styles.entrySecondaryButtonText}>Sign in</Text>
+                </TouchableOpacity>
+                <Text style={styles.loginSafety}>Not for emergencies. For urgent needs, contact local emergency services.</Text>
+              </View>
+            ) : null}
+
+            {entryScreen === "start" ? (
+              <View style={styles.loginCard}>
+                <TouchableOpacity accessibilityRole="button" onPress={() => showEntryScreen("welcome")}>
+                  <Text style={styles.backLink}>‹ Back</Text>
+                </TouchableOpacity>
+                <Text style={styles.eyebrow}>Closed beta access</Text>
+                <Text style={styles.loginTitle}>How would you like to continue?</Text>
+                <Text style={styles.sectionIntro}>
+                  Invitations unlock an existing account. New patients and families can request early access without sharing care details.
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={styles.entryPrimaryButton}
+                  onPress={() => showEntryScreen("signin")}
+                >
+                  <Text style={styles.entryPrimaryButtonText}>I have an invitation</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={styles.entrySecondaryButton}
+                  onPress={() => showEntryScreen("access")}
+                >
+                  <Text style={styles.entrySecondaryButtonText}>Request early access</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {entryScreen === "signin" ? (
+              <View style={styles.loginCard}>
+                <TouchableOpacity accessibilityRole="button" onPress={() => showEntryScreen("welcome")}>
+                  <Text style={styles.backLink}>‹ Back</Text>
+                </TouchableOpacity>
+                <Text style={styles.eyebrow}>Secure patient access</Text>
+                <Text style={styles.loginTitle}>Welcome back</Text>
+                <Text style={styles.sectionIntro}>Sign in with the account from your NurseBridges invitation.</Text>
+                <Text style={styles.inputLabel}>Email</Text>
+                <TextInput
+                  accessibilityLabel="Email address"
+                  style={styles.input}
+                  placeholder="you@example.com"
+                  placeholderTextColor={colors.mutedSoft}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  keyboardType="email-address"
+                  textContentType="emailAddress"
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordInputRef.current?.focus()}
+                  value={email}
+                  onChangeText={setEmail}
+                />
+                <Text style={styles.inputLabel}>Password</Text>
+                <TextInput
+                  ref={passwordInputRef}
+                  accessibilityLabel="Password"
+                  style={styles.input}
+                  placeholder="Your password"
+                  placeholderTextColor={colors.mutedSoft}
+                  autoComplete="current-password"
+                  secureTextEntry
+                  textContentType="password"
+                  returnKeyType="go"
+                  onSubmitEditing={handleSignIn}
+                  value={password}
+                  onChangeText={setPassword}
+                />
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue securely"
+                  style={styles.entryPrimaryButton}
+                  onPress={handleSignIn}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.entryPrimaryButtonText}>Continue securely</Text>}
+                </TouchableOpacity>
+                <Text style={styles.loginSafety}>Only use credentials from your NurseBridges invitation.</Text>
+              </View>
+            ) : null}
+
+            {entryScreen === "access" ? (
+              <View style={styles.loginCard}>
+                <TouchableOpacity accessibilityRole="button" onPress={() => showEntryScreen("start")}>
+                  <Text style={styles.backLink}>‹ Back</Text>
+                </TouchableOpacity>
+                <Text style={styles.eyebrow}>Request early access</Text>
+                <Text style={styles.loginTitle}>Tell us where to reach you</Text>
+                <Text style={styles.sectionIntro}>
+                  Please do not include diagnoses, medical details, documents, or care instructions.
+                </Text>
+
+                <Text style={styles.inputLabel}>Full name</Text>
+                <TextInput
+                  accessibilityLabel="Full name"
+                  style={styles.input}
+                  placeholder="Your name"
+                  placeholderTextColor={colors.mutedSoft}
+                  autoCapitalize="words"
+                  autoComplete="name"
+                  textContentType="name"
+                  value={accessForm.fullName}
+                  onChangeText={(value) => updateAccessForm("fullName", value)}
+                />
+                <Text style={styles.inputLabel}>Email</Text>
+                <TextInput
+                  accessibilityLabel="Early access email address"
+                  style={styles.input}
+                  placeholder="you@example.com"
+                  placeholderTextColor={colors.mutedSoft}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  keyboardType="email-address"
+                  textContentType="emailAddress"
+                  value={accessForm.email}
+                  onChangeText={(value) => updateAccessForm("email", value)}
+                />
+                <Text style={styles.inputLabel}>Phone (optional)</Text>
+                <TextInput
+                  accessibilityLabel="Phone number"
+                  style={styles.input}
+                  placeholder="(555) 555-0100"
+                  placeholderTextColor={colors.mutedSoft}
+                  autoComplete="tel"
+                  keyboardType="phone-pad"
+                  textContentType="telephoneNumber"
+                  value={accessForm.phone}
+                  onChangeText={(value) => updateAccessForm("phone", value)}
+                />
+                <Text style={styles.inputLabel}>City or ZIP code</Text>
+                <TextInput
+                  accessibilityLabel="City or ZIP code"
+                  style={styles.input}
+                  placeholder="Your general service area"
+                  placeholderTextColor={colors.mutedSoft}
+                  autoCapitalize="words"
+                  value={accessForm.serviceArea}
+                  onChangeText={(value) => updateAccessForm("serviceArea", value)}
+                />
+
+                <Text style={styles.inputLabel}>Who are you requesting access for?</Text>
+                <View style={styles.choiceRow}>
+                  <TouchableOpacity
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: accessForm.requesterType === "patient" }}
+                    style={[styles.choiceButton, accessForm.requesterType === "patient" ? styles.choiceButtonActive : null]}
+                    onPress={() => updateAccessForm("requesterType", "patient")}
+                  >
+                    <Text style={[styles.choiceButtonText, accessForm.requesterType === "patient" ? styles.choiceButtonTextActive : null]}>Myself</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: accessForm.requesterType === "family" }}
+                    style={[styles.choiceButton, accessForm.requesterType === "family" ? styles.choiceButtonActive : null]}
+                    onPress={() => updateAccessForm("requesterType", "family")}
+                  >
+                    <Text style={[styles.choiceButtonText, accessForm.requesterType === "family" ? styles.choiceButtonTextActive : null]}>A family member</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: accessForm.contactConsent }}
+                  style={styles.consentRow}
+                  onPress={() => updateAccessForm("contactConsent", !accessForm.contactConsent)}
+                >
+                  <View style={[styles.checkbox, accessForm.contactConsent ? styles.checkboxChecked : null]}>
+                    <Text style={styles.checkboxMark}>{accessForm.contactConsent ? "✓" : ""}</Text>
+                  </View>
+                  <Text style={styles.consentText}>I agree that NurseBridges may contact me about closed-beta access.</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={styles.entryPrimaryButton}
+                  onPress={handlePatientAccessRequest}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.entryPrimaryButtonText}>Request early access</Text>}
+                </TouchableOpacity>
+                <Text style={styles.loginSafety}>Submitting this form does not create an account or guarantee service availability.</Text>
+              </View>
+            ) : null}
+
+            {entryScreen === "submitted" ? (
+              <View style={styles.loginCard}>
+                <View style={styles.successIcon}><Text style={styles.successIconText}>✓</Text></View>
+                <Text style={styles.eyebrow}>Request received</Text>
+                <Text style={styles.loginTitle}>You’re on the early-access list</Text>
+                <Text style={styles.sectionIntro}>
+                  Our beta team will contact you if NurseBridges is available in your area. You do not need to submit another request.
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={styles.entryPrimaryButton}
+                  onPress={() => showEntryScreen("signin")}
+                >
+                  <Text style={styles.entryPrimaryButtonText}>Go to sign in</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={styles.entrySecondaryButton}
+                  onPress={() => showEntryScreen("welcome")}
+                >
+                  <Text style={styles.entrySecondaryButtonText}>Back to welcome</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
         ) : null}
         {session ? <View style={styles.headerPanel}>
@@ -1400,8 +1629,8 @@ export default function App() {
           </View>
         </View> : null}
 
-        {error ? <ErrorNotice message={error} onCopy={copyErrorDetails} /> : null}
-        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+        {session && error ? <ErrorNotice message={error} onCopy={copyErrorDetails} /> : null}
+        {session && notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
         {!session ? null : (
           <>
@@ -2085,6 +2314,71 @@ return StyleSheet.create({
   loginCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 26, borderWidth: 1, marginBottom: 14, padding: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 24 },
   loginTitle: { color: colors.ink, fontSize: 25, fontWeight: "900", letterSpacing: -0.8 },
   loginSafety: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 14, textAlign: "center" },
+  backLink: { color: colors.accent, fontSize: 14, fontWeight: "800", marginBottom: 18 },
+  entryPrimaryButton: {
+    alignItems: "center",
+    backgroundColor: colors.accent,
+    borderRadius: 16,
+    justifyContent: "center",
+    marginTop: 10,
+    minHeight: 56,
+    paddingHorizontal: 18,
+    paddingVertical: 14
+  },
+  entryPrimaryButtonText: { color: colors.onAccent, fontSize: 16, fontWeight: "900" },
+  entrySecondaryButton: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.borderStrong,
+    borderRadius: 16,
+    borderWidth: 1,
+    justifyContent: "center",
+    marginTop: 10,
+    minHeight: 56,
+    paddingHorizontal: 18,
+    paddingVertical: 14
+  },
+  entrySecondaryButtonText: { color: colors.ink, fontSize: 16, fontWeight: "900" },
+  choiceRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
+  choiceButton: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 48,
+    paddingHorizontal: 10,
+    paddingVertical: 10
+  },
+  choiceButtonActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent },
+  choiceButtonText: { color: colors.inkSoft, fontSize: 13, fontWeight: "800", textAlign: "center" },
+  choiceButtonTextActive: { color: colors.accentDark },
+  consentRow: { alignItems: "flex-start", flexDirection: "row", gap: 12, marginBottom: 6, paddingVertical: 8 },
+  checkbox: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.borderStrong,
+    borderRadius: 7,
+    borderWidth: 1,
+    height: 24,
+    justifyContent: "center",
+    width: 24
+  },
+  checkboxChecked: { backgroundColor: colors.accent, borderColor: colors.accent },
+  checkboxMark: { color: colors.onAccent, fontSize: 15, fontWeight: "900", lineHeight: 18 },
+  consentText: { color: colors.inkSoft, flex: 1, fontSize: 13, lineHeight: 19 },
+  successIcon: {
+    alignItems: "center",
+    backgroundColor: colors.successMuted,
+    borderRadius: 22,
+    height: 44,
+    justifyContent: "center",
+    marginBottom: 18,
+    width: 44
+  },
+  successIconText: { color: colors.success, fontSize: 22, fontWeight: "900" },
   productGate: {
     alignSelf: "center",
     backgroundColor: colors.surface,

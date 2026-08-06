@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import type { Session } from "@supabase/supabase-js";
-import { ApiRequestError, apiFetch, formatApiErrorMessage } from "../src/api";
+import { ApiRequestError, apiFetch, apiPublicFetch, formatApiErrorMessage } from "../src/api";
 
 const originalFetch = globalThis.fetch;
 const originalDateNow = Date.now;
@@ -87,5 +87,24 @@ describe("mobile API helper", () => {
 
   it("returns the caller fallback for non-API errors", () => {
     assert.equal(formatApiErrorMessage("Unable to create job.", new Error("Network down")), "Unable to create job.");
+  });
+
+  it("sends public requests without an authorization header", async () => {
+    let sentHeaders = new Headers();
+    globalThis.fetch = async (_url, init) => {
+      sentHeaders = new Headers(init?.headers);
+      return jsonResponse(202, { ok: true });
+    };
+
+    const response = await apiPublicFetch<{ ok: boolean }>(
+      "https://api.example.test",
+      "/v1/access-requests/patient",
+      { method: "POST", body: JSON.stringify({ email: "test@example.com" }) }
+    );
+
+    assert.deepEqual(response, { ok: true });
+    assert.equal(sentHeaders.has("Authorization"), false);
+    assert.match(sentHeaders.get("x-request-id") ?? "", /^mobile-/);
+    assert.equal(sentHeaders.get("Content-Type"), "application/json");
   });
 });

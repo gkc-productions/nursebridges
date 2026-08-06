@@ -69,8 +69,9 @@ async function fetchAssignedNurseMap(jobIds: string[], jwt: string) {
   const nurseIds = Array.from(new Set(Array.from(assigned.values())));
   const names = new Map<string, string>();
 
-  if (nurseIds.length > 0 && supabaseAdmin) {
-    const { data: profiles } = await supabaseAdmin
+  const adminClient = supabaseAdmin;
+  if (nurseIds.length > 0 && adminClient) {
+    const { data: profiles } = await adminClient
       .from("profiles")
       .select("id,full_name")
       .in("id", nurseIds);
@@ -81,7 +82,7 @@ async function fetchAssignedNurseMap(jobIds: string[], jwt: string) {
 
     await Promise.all(
       nurseIds.filter((id) => !names.get(id)).map(async (id) => {
-        const { data } = await supabaseAdmin.auth.admin.getUserById(id);
+        const { data } = await adminClient.auth.admin.getUserById(id);
         const email = data?.user?.email;
         if (email) names.set(id, email);
       })
