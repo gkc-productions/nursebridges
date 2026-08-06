@@ -56,19 +56,16 @@ for (const forbidden of ["title", "address", "description", "mobility", "contact
 }
 
 for (const snippet of [
-  "function WorkflowEvidencePanel",
+  "function SupportSnapshotPanel",
   "Support snapshot",
   "await Clipboard.setStringAsync(workflowEvidence.copyText)",
-  "<WorkflowSnapshotPanel snapshot={workflowSnapshot} />",
-  "<WorkflowEvidencePanel rows={workflowEvidence.rows} onCopy={copyWorkflowEvidence} />"
+  "<SupportSnapshotPanel rows={supportRows} onCopy={onCopySupport} />",
+  "supportRows={workflowEvidence.rows}",
+  "onCopySupport={copyWorkflowEvidence}"
 ]) {
   if (!app.includes(snippet)) {
     fail(`mobile app support snapshot surface is missing required snippet: ${snippet}`);
   }
-}
-
-if (app.indexOf("<WorkflowEvidencePanel") < app.indexOf("<WorkflowSnapshotPanel")) {
-  fail("support snapshot must render after the workflow snapshot, not before it");
 }
 
 for (const snippet of [

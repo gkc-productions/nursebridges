@@ -34,12 +34,12 @@ const trustGuard = read(trustGuardDoc);
 
 for (const snippet of [
   "Beta access and support",
-  "NurseBridge is a closed beta care coordination tool. It is not an emergency service.",
+  "NurseBridges is a closed beta care coordination tool. It is not an emergency service.",
   "For app issues, copy the issue details when an error appears and send them to the beta operator.",
   "For urgent medical or safety needs, use local emergency services or the patient's normal care contact.",
-  "Submit only the details needed for closed-beta review, assignment, and follow-up.",
-  "This is not an",
-  "emergency service or a full medical chart.",
+  "A few clear details help the care team review your request.",
+  "Do not include diagnoses, policy or payment numbers, or a full medical history.",
+  "NurseBridges is not an emergency service.",
   "Upload requested documents for admin review after you are comfortable sharing them for beta",
   "Approval is not automatic",
   "this beta does not claim background-check or",

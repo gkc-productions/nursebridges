@@ -9,6 +9,39 @@ Use `docs/release/beta-evidence-templates.md` when copying a fresh evidence bloc
 
 ## Engineering Evidence
 
+### Installed iPhone end-to-end workflow proof
+
+```text
+Date/time: 2026-08-03 03:45-11:08
+Timezone: America/New_York
+Runner/tester: Owner with Codex-guided verification
+Device: Physical iPhone, installed signed development build
+Signing team: HKQJ75SQVF
+API: https://api.nursebridges.com (connected)
+Patient request: Test care support request
+Request ID: 2785c7b5-96b8-4900-b1a7-54747332cf70
+Observed workflow:
+- Patient signed in and created the non-sensitive test request successfully.
+- Approved test nurse nurse@example.com viewed the request and applied.
+- Admin web displayed the applicant and assigned the request.
+- Nurse app displayed the assigned request and completed it.
+- Patient app displayed the completed final record and completion notification.
+- Nurse and patient in-app notification surfaces displayed the relevant workflow updates.
+Result: PASS for create -> apply -> admin assign -> nurse complete on the original combined engineering build.
+Not proven by this evidence: cancellation, verification-document upload, push delivery, Android, redesigned Patient build, separate Care build, or public early-access endpoint.
+Privacy note: Test-only care details were used; no credentials, tokens, or secret values are recorded here.
+```
+
+### Existing TestFlight distribution-path proof
+
+```text
+Date/time: 2026-08-04
+Timezone: America/New_York
+Runner/tester: Owner
+Result: Owner confirmed the existing iOS beta could be downloaded through TestFlight after stable Xcode first-launch setup.
+Limitation: This confirms the Apple/TestFlight distribution path, not the newly redesigned Patient build. A fresh signed archive, upload, processing check, and install verification are still required.
+```
+
 ### Quick build status command
 
 ```text

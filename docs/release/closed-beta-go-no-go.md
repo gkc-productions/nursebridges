@@ -1,6 +1,6 @@
 # Closed Beta Go/No-Go Packet
 
-This packet is the owner/operator decision page for moving NurseBridge from engineering build to tiny controlled closed beta.
+This packet is the owner/operator decision page for moving NurseBridges from engineering build to tiny controlled closed beta.
 
 It does not certify HIPAA, insurance, clinical, licensing, background-check, SOC 2, or public marketplace readiness. It only decides whether a small supervised beta can run with known limitations.
 
@@ -10,13 +10,15 @@ Status: No-go for outside testers.
 
 Reason:
 
-- Real-device patient create-request proof after the deployed backend fix is still missing.
-- Full patient -> nurse -> admin -> terminal outcome proof is still missing.
+- Real-device create, apply, assign, complete, and in-app notification proof exists for the original combined engineering build, but not yet for the redesigned separate Patient and Care releases.
+- The cancellation path is still missing.
 - Legal/privacy/terms/verification consent are not finalized.
-- Real-device verification upload and notification proof are still missing.
+- Real-device verification-document upload proof is still missing.
 - Backup/restore evidence is missing.
 - Beta access, revocation, and secret-owner evidence are not finalized.
-- The latest 131-file local package still needs VM root verification when SSH escalation/usage access returns.
+- The new patient early-access migration/API route is not deployed, and the redesigned Patient build has not been verified through TestFlight.
+
+The historical 131-file VM verification package remains documented in `docs/release/pending-vm-verification.md`; it is not evidence for the newer Patient redesign by itself.
 
 ## Who Can Approve
 
@@ -104,11 +106,7 @@ Use `docs/release/beta-evidence-templates.md` for copy-ready evidence blocks.
 
 ## Next Best Action
 
-The next engineering action is not more broad UI polish. It is one of:
-
-1. Restore SSH escalation/usage access and run the pending 131-file VM root verification checklist in `docs/release/pending-vm-verification.md`.
-2. Resolve installed-device access through approved iOS signing/TestFlight path or recovered Android access.
-3. Capture one real-device patient create-request attempt and use request IDs/logs to prove or fix the workflow.
+Deploy and verify the reviewed patient-access migration/API route as a scoped production change, then archive and upload the redesigned Patient app to TestFlight. After Patient validation, build the separate NurseBridges Care release and prove cancellation, verification upload, and remaining operational gates.
 
 ## Decision Template
 

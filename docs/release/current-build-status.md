@@ -1,6 +1,6 @@
 # Current Build Status
 
-Twin automation is paused and is not part of the active NurseBridge build workflow.
+Twin automation is paused and is not part of the active NurseBridges build workflow.
 
 ## Active Workflow
 
@@ -11,9 +11,10 @@ Twin automation is paused and is not part of the active NurseBridge build workfl
 
 ## Product Direction
 
-NurseBridge is being shaped as a serious care-access coordination platform:
+NurseBridges is being shaped as a serious care-access coordination platform:
 
-- Mobile app for patients/families and nurses/caregivers.
+- A dedicated NurseBridges patient/family mobile app.
+- A separate NurseBridges Care mobile app for nurses/caregivers.
 - Web admin console for dispatcher/admin operations.
 - Fastify API as the workflow backbone.
 - Supabase for auth, database, and private verification storage.
@@ -23,7 +24,9 @@ The first production milestone is a controlled closed beta, not public launch.
 
 ## Current Active Blocker
 
-The backend create-job payload fix is deployed and verified on the VM, but real-device patient create-request proof is still missing.
+The original installed-iPhone workflow is proven through request creation, nurse application, admin assignment, nurse completion, and patient/nurse in-app notifications. The active release blocker is now the redesigned Patient app: its new public early-access endpoint and database migration are committed locally but not deployed, and the redesigned signed build has not yet been archived, uploaded, or verified through TestFlight.
+
+The cancellation path is still unproven. The verified workflow used the earlier combined engineering build; it does not by itself validate the new separate Patient and Care product releases.
 
 The previous observed blocker was Android `POST /jobs` returning `400`. Live schema inspection showed the `jobs` table requires `created_by`, and the API create-job insert payload now sets `created_by`, `patient_user_id`, and `patient_id` from the authenticated patient. On 2026-07-18, VM API typecheck, build, 49 API tests, and the read-only live create-job schema contract guard passed after the fix.
 
@@ -39,7 +42,7 @@ Current phone-proof unblocker: use either path, not both. For Android, make the 
 
 The mobile API environment fallback now protects physical iPhone and Android devices from using a stored `localhost` API base URL. Physical devices fall back to the approved tunnel/API base instead, which reduces false create-job failures during real-device testing.
 
-Create-job route regression coverage now verifies patient-only access, mobile payload validation, normalized insert payloads, and request IDs on insert failure. The blocker is no longer lack of API instrumentation or known payload fix; it is lack of one fresh real-device create-request attempt after the deployed fix.
+Create-job route regression coverage verifies patient-only access, mobile payload validation, normalized insert payloads, and request IDs on insert failure. The deployed fix was subsequently proven from the installed iPhone.
 
 Admin dispatcher regression coverage now exists for assignment, cancel/complete terminal actions, and nurse verification approval/rejection. These tests protect guarded writes, notification creation, and audit logging for the trust-sensitive admin workflows.
 
@@ -198,9 +201,10 @@ The smoke script now has regression coverage in root `pnpm test`. The script-lev
 
 ## Current Product Priorities
 
-1. Prove mobile create-request from a real installed mobile build now that the backend fix is deployed. iOS/internal can prove first; Android must be rechecked before wider beta unless the owner explicitly accepts an iPhone-first beta limitation.
-2. Prove the patient -> nurse -> admin -> complete/cancel workflow.
-3. Redesign the mobile app into a serious role-based care product.
+1. Deploy and verify the reviewed public patient-access endpoint/migration before releasing the redesigned Patient app.
+2. Archive, upload, and verify the redesigned Patient app through TestFlight.
+3. Build and release the separate NurseBridges Care app without patient/admin role switching.
+4. Prove the cancellation path and recheck Android before wider beta unless the owner explicitly accepts an iPhone-first limitation.
 4. Deploy/sync the admin dispatcher console to the VM when ready and prove it with a controlled admin account.
 5. Continue consolidating duplicated lifecycle/dispatcher logic between Fastify and admin server routes.
 6. Expand beta verification scripts.
@@ -218,6 +222,6 @@ The smoke script now has regression coverage in root `pnpm test`. The script-lev
 
 ## Next Priority
 
-Follow `docs/release/closed-beta-operator-runbook.md`: resolve Apple signing/provisioning for `com.nursebridges.mobile`, choose `ios-internal` or `ios-testflight`, install a real iPhone build or create an approved TestFlight build, then trigger one real create-request attempt, inspect API logs, and record the result. Recheck Android before wider beta unless the owner explicitly accepts an iPhone-first limitation.
+Review and apply the committed patient-access migration/API route as one scoped production change, verify it without exposing secrets, then create a new signed Patient archive for `com.nursebridges.mobile` and upload it to TestFlight. Keep the separate NurseBridges Care build and cancellation proof as subsequent focused slices.
 
 The latest iOS build review is `docs/release/ios-internal-build-readiness-review-2026-07-17.md`. It records the successful local native Xcode build and the current signed-install blocker.

@@ -57,6 +57,7 @@ import {
   buildNurseRequestDetailModel,
   buildNurseWorkflowSnapshot,
   buildPatientWorkflowSnapshot,
+  buildWorkflowEvidenceSummary,
   buildCreateCareRequestPayload,
   buildPatientRequestDetailModel,
   buildVerificationStoragePath,
@@ -399,15 +400,19 @@ function AccountPanel({
   role,
   baseUrl,
   nurseProfile,
+  supportRows,
   actionLoading,
-  onSignOut
+  onSignOut,
+  onCopySupport
 }: {
   email: string | undefined;
   role: UserRole | null;
   baseUrl: string;
   nurseProfile: NurseProfile | null;
+  supportRows?: Array<{ label: string; value: string }>;
   actionLoading: boolean;
   onSignOut: () => void;
+  onCopySupport?: () => void;
 }) {
   return (
     <View style={styles.card}>
@@ -421,6 +426,7 @@ function AccountPanel({
       {role === "nurse" && nurseProfile ? (
         <FieldRow label="Verification status" value={nurseProfile.verification_status} />
       ) : null}
+      {supportRows && onCopySupport ? <SupportSnapshotPanel rows={supportRows} onCopy={onCopySupport} /> : null}
       <View style={styles.supportPanel}>
         <Text style={styles.supportTitle}>Support note</Text>
         <Text style={styles.emptyText}>
@@ -430,6 +436,23 @@ function AccountPanel({
       <TouchableOpacity style={styles.smallButton} onPress={onSignOut} disabled={actionLoading}>
         <Text style={styles.smallButtonText}>Sign Out</Text>
       </TouchableOpacity>
+    </View>
+  );
+}
+
+function SupportSnapshotPanel({ rows, onCopy }: { rows: Array<{ label: string; value: string }>; onCopy: () => void }) {
+  return (
+    <View style={styles.supportSnapshot}>
+      <View style={styles.rowBetween}>
+        <View style={styles.flex}>
+          <Text style={styles.supportTitle}>Support snapshot</Text>
+          <Text style={styles.supportSnapshotIntro}>Share this technical summary if the beta team asks. It excludes care details.</Text>
+        </View>
+        <TouchableOpacity accessibilityRole="button" style={styles.supportCopyButton} onPress={onCopy}>
+          <Text style={styles.supportCopyButtonText}>Copy</Text>
+        </TouchableOpacity>
+      </View>
+      {rows.map((row) => <FieldRow key={row.label} label={row.label} value={row.value} />)}
     </View>
   );
 }
@@ -814,6 +837,18 @@ export default function App() {
     session?.user.id,
     unreadNotificationCount
   ]);
+  const workflowEvidence = useMemo(() => {
+    const focusedRequest = role === "patient" ? patientFocusJob : role === "nurse" ? nurseFocusJob : null;
+    const totalRecords = role === "patient" ? patientJobs.length : role === "nurse" ? nurseJobs.length : 0;
+    return buildWorkflowEvidenceSummary({
+      role,
+      apiConfigured: Boolean(baseUrl),
+      focusedRequestId: focusedRequest?.id,
+      focusedRequestStatus: focusedRequest?.status,
+      totalRecords,
+      unreadNotifications: unreadNotificationCount
+    });
+  }, [baseUrl, nurseFocusJob, nurseJobs.length, patientFocusJob, patientJobs.length, role, unreadNotificationCount]);
   const dashboardMetrics = useMemo(() => {
     if (role === "patient") {
       return [
@@ -1346,6 +1381,11 @@ export default function App() {
 
     await Clipboard.setStringAsync(error);
     setNotice("Issue details copied.");
+  }
+
+  async function copyWorkflowEvidence() {
+    await Clipboard.setStringAsync(workflowEvidence.copyText);
+    setNotice("Support snapshot copied.");
   }
 
   function confirmJobTransition(job: JobRow, action: "cancel" | "complete") {
@@ -1891,8 +1931,10 @@ export default function App() {
                     role={role}
                     baseUrl={baseUrl}
                     nurseProfile={nurseProfile}
+                    supportRows={workflowEvidence.rows}
                     actionLoading={actionLoading}
                     onSignOut={handleSignOut}
+                    onCopySupport={copyWorkflowEvidence}
                   />
                 ) : null}
 
@@ -1925,7 +1967,7 @@ export default function App() {
                           value={jobForm.description}
                           onChangeText={(text) => setJobForm((prev) => ({ ...prev, description: text }))}
                         />
-                        <Text style={styles.formPrivacyNote}>Do not include diagnoses, insurance numbers, or a full medical history.</Text>
+                        <Text style={styles.formPrivacyNote}>Do not include diagnoses, policy or payment numbers, or a full medical history.</Text>
                       </View>
                     ) : null}
 
@@ -2276,8 +2318,10 @@ export default function App() {
                 role={role}
                 baseUrl={baseUrl}
                 nurseProfile={nurseProfile}
+                supportRows={workflowEvidence.rows}
                 actionLoading={actionLoading}
                 onSignOut={handleSignOut}
+                onCopySupport={copyWorkflowEvidence}
               />
             ) : null}
 
@@ -2895,6 +2939,17 @@ return StyleSheet.create({
     marginTop: 10,
     padding: 12
   },
+  supportSnapshot: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 14
+  },
+  supportSnapshotIntro: { color: colors.muted, fontSize: 11, lineHeight: 16, marginBottom: 8 },
+  supportCopyButton: { backgroundColor: colors.accentMuted, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  supportCopyButtonText: { color: colors.accentDark, fontSize: 12, fontWeight: "900" },
   supportTitle: {
     color: colors.ink,
     fontSize: 13,

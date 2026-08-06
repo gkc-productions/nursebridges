@@ -125,7 +125,8 @@ for (const snippet of [
 }
 
 for (const snippet of [
-  "Full patient -> nurse -> admin -> terminal outcome proof is still missing.",
+  "Real-device create, apply, assign, complete, and in-app notification proof exists",
+  "The cancellation path is still missing.",
   "Admin sees the applicant and assigns safely.",
   "Assigned nurse or patient completes the request.",
   "Cancellation path is proven and rejects pending applications."

@@ -29,12 +29,13 @@ describe("quick build status command", () => {
 
     assert.equal(result.code, 0);
     assert.equal(result.stderr, "");
-    assert.match(result.stdout, /NurseBridge Build Status/);
+    assert.match(result.stdout, /NurseBridges Build Status/);
     assert.match(result.stdout, /NO-GO for outside testers/);
     assert.match(result.stdout, /Staged package\s+131 files/);
-    assert.match(result.stdout, /Create request proof\s+missing from a real installed phone/);
+    assert.match(result.stdout, /iPhone workflow\s+patient create -> nurse apply -> admin assign -> nurse complete proven/);
     assert.match(result.stdout, /Android\s+adb installed, no authorized device visible/);
-    assert.match(result.stdout, /iPhone\s+visible to Xcode, missing provisioning profile/);
-    assert.match(result.stdout, /capture one patient create-request proof against https:\/\/api\.nursebridges\.com/);
+    assert.match(result.stdout, /iPhone\s+signing, installed build, and TestFlight download path proven/);
+    assert.match(result.stdout, /Patient release\s+new onboarding\/home\/request UX needs signed build verification/);
+    assert.match(result.stdout, /apply the reviewed patient-access migration and deploy its API route/);
   });
 });
