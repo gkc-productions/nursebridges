@@ -455,28 +455,75 @@ function PatientTabBar({
   activeTab: PatientTab;
   onChange: (tab: PatientTab) => void;
 }) {
-  const tabs: Array<{ key: PatientTab; label: string }> = [
-    { key: "home", label: "Home" },
-    { key: "new", label: "New Request" },
-    { key: "records", label: "Records" },
-    { key: "updates", label: "Updates" },
-    { key: "account", label: "Account" }
+  const tabs: Array<{ key: PatientTab; label: string; icon: string }> = [
+    { key: "home", label: "Home", icon: "⌂" },
+    { key: "new", label: "Request", icon: "+" },
+    { key: "records", label: "Activity", icon: "≡" },
+    { key: "updates", label: "Updates", icon: "•" },
+    { key: "account", label: "Profile", icon: "○" }
   ];
 
   return (
-    <View style={styles.tabBar}>
+    <View style={styles.patientTabBar}>
       {tabs.map((tab) => {
         const isActive = activeTab === tab.key;
         return (
           <TouchableOpacity
             key={tab.key}
-            style={[styles.tabButton, isActive ? styles.tabButtonActive : null]}
+            accessibilityRole="tab"
+            accessibilityLabel={tab.label}
+            accessibilityState={{ selected: isActive }}
+            style={styles.patientTabButton}
             onPress={() => onChange(tab.key)}
           >
-            <Text style={[styles.tabButtonText, isActive ? styles.tabButtonTextActive : null]}>{tab.label}</Text>
+            <Text style={[styles.patientTabIcon, isActive ? styles.patientTabIconActive : null]}>{tab.icon}</Text>
+            <Text style={[styles.patientTabLabel, isActive ? styles.patientTabLabelActive : null]}>{tab.label}</Text>
           </TouchableOpacity>
         );
       })}
+    </View>
+  );
+}
+
+function PatientQuickActions({
+  unreadCount,
+  onRequest,
+  onActivity,
+  onUpdates
+}: {
+  unreadCount: number;
+  onRequest: () => void;
+  onActivity: () => void;
+  onUpdates: () => void;
+}) {
+  const actions = [
+    { label: "Request care", detail: "Tell us what you need", symbol: "+", onPress: onRequest },
+    { label: "View activity", detail: "Follow every request", symbol: "≡", onPress: onActivity },
+    {
+      label: "Updates",
+      detail: unreadCount > 0 ? `${unreadCount} new ${unreadCount === 1 ? "message" : "messages"}` : "You're all caught up",
+      symbol: "•",
+      onPress: onUpdates
+    }
+  ];
+
+  return (
+    <View style={styles.quickActionsSection}>
+      <Text style={styles.homeSectionTitle}>What would you like to do?</Text>
+      <View style={styles.quickActionsGrid}>
+        {actions.map((action) => (
+          <TouchableOpacity
+            accessibilityRole="button"
+            key={action.label}
+            style={styles.quickActionCard}
+            onPress={action.onPress}
+          >
+            <View style={styles.quickActionIcon}><Text style={styles.quickActionIconText}>{action.symbol}</Text></View>
+            <Text style={styles.quickActionTitle}>{action.label}</Text>
+            <Text style={styles.quickActionDetail}>{action.detail}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </View>
   );
 }
@@ -1613,19 +1660,18 @@ export default function App() {
               <Text style={styles.environmentTag}>{themeMode === "dark" ? "Light" : "Dark"}</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.title}>{getRoleHeadline(role)}</Text>
-          <Text style={styles.subTitle}>{getRoleSubhead(role)}</Text>
-          <WorkflowSnapshotPanel snapshot={workflowSnapshot} />
-          <View style={styles.metricsGrid}>
-            {dashboardMetrics.map((metric) => (
-              <MetricTile key={metric.label} label={metric.label} value={metric.value} />
-            ))}
-          </View>
-          <View style={styles.headerMetaRow}>
-            <Text style={styles.headerMeta}>Patient account</Text>
+          <Text style={styles.title}>Your care, in one place</Text>
+          <Text style={styles.subTitle}>Request support and see what is happening next.</Text>
+          <View style={styles.headerStatusRow}>
+            <View style={styles.headerStatusCopy}>
+              <Text style={styles.headerStatusLabel}>Current status</Text>
+              <Text style={styles.headerStatusValue}>{workflowSnapshot.status}</Text>
+            </View>
             {unreadNotificationCount > 0 ? (
-              <Text style={styles.headerMeta}>{unreadNotificationCount} unread</Text>
-            ) : null}
+              <TouchableOpacity accessibilityRole="button" onPress={() => setPatientTab("updates")}>
+                <Text style={styles.headerMeta}>{unreadNotificationCount} new</Text>
+              </TouchableOpacity>
+            ) : <Text style={styles.headerMeta}>Up to date</Text>}
           </View>
         </View> : null}
 
@@ -1656,13 +1702,18 @@ export default function App() {
               </View>
             ) : null}
 
-            {role === "patient" ? <PatientTabBar activeTab={patientTab} onChange={setPatientTab} /> : null}
             {role === "nurse" ? <NurseTabBar activeTab={nurseTab} onChange={setNurseTab} /> : null}
 
             {role === "patient" && patientTab === "home" ? (
               <>
+                <PatientQuickActions
+                  unreadCount={unreadNotificationCount}
+                  onRequest={() => setPatientTab("new")}
+                  onActivity={() => setPatientTab("records")}
+                  onUpdates={() => setPatientTab("updates")}
+                />
                 <NextActionPanel
-                  eyebrow="Patient next action"
+                  eyebrow="Next step"
                   title={patientFocusJob ? patientFocusJob.title : "Create the first care request"}
                   status={patientFocusJob?.status}
                   body={
@@ -1694,13 +1745,15 @@ export default function App() {
                   }
                   disabled={actionLoading}
                 />
-                {patientFocusJob && patientRequestDetail ? (
-                  <PatientRequestDetailPanel
-                    detail={patientRequestDetail}
-                    actionLoading={actionLoading}
-                    onCancel={() => confirmJobTransition(patientFocusJob, "cancel")}
-                    onComplete={() => confirmJobTransition(patientFocusJob, "complete")}
-                  />
+                {patientFocusJob ? (
+                  <TouchableOpacity accessibilityRole="button" style={styles.activityPreview} onPress={() => setPatientTab("records")}>
+                    <View style={styles.flex}>
+                      <Text style={styles.eyebrow}>Latest activity</Text>
+                      <Text style={styles.activityPreviewTitle}>{latestNotification?.title ?? workflowSummary(patientFocusJob)}</Text>
+                      <Text style={styles.activityPreviewBody}>Open your activity to see the full request timeline.</Text>
+                    </View>
+                    <Text style={styles.activityPreviewArrow}>›</Text>
+                  </TouchableOpacity>
                 ) : null}
                 <PatientSupportSafetyPanel onOpenAccount={() => setPatientTab("account")} />
               </>
@@ -2143,6 +2196,7 @@ export default function App() {
           </>
         )}
       </ScrollView>
+      {session && role === "patient" ? <PatientTabBar activeTab={patientTab} onChange={setPatientTab} /> : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -2167,13 +2221,13 @@ return StyleSheet.create({
   content: {
     flexGrow: 1,
     padding: 16,
-    paddingBottom: 44
+    paddingBottom: 28
   },
   headerPanel: {
     backgroundColor: colors.hero,
     borderRadius: 28,
     marginBottom: 16,
-    padding: 18,
+    padding: 20,
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
@@ -2211,17 +2265,32 @@ return StyleSheet.create({
     textTransform: "uppercase"
   },
   title: {
-    fontSize: 26,
-    fontWeight: "800",
+    fontSize: 30,
+    fontWeight: "900",
     color: colors.heroText,
+    letterSpacing: -1,
     marginBottom: 8
   },
   subTitle: {
     fontSize: 14,
     color: colors.heroMuted,
     lineHeight: 20,
-    marginBottom: 14
+    marginBottom: 18
   },
+  headerStatusRow: {
+    alignItems: "center",
+    backgroundColor: colors.heroSurface,
+    borderColor: colors.heroBorder,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 12
+  },
+  headerStatusCopy: { flex: 1, paddingRight: 12 },
+  headerStatusLabel: { color: colors.heroMuted, fontSize: 10, fontWeight: "800", marginBottom: 3, textTransform: "uppercase" },
+  headerStatusValue: { color: colors.heroText, fontSize: 15, fontWeight: "900" },
   metricsGrid: {
     flexDirection: "row",
     gap: 8,
@@ -2413,11 +2482,10 @@ return StyleSheet.create({
   nextActionPanel: {
     backgroundColor: colors.surface,
     borderColor: colors.accent,
-    borderLeftWidth: 4,
-    borderRadius: 8,
+    borderRadius: 22,
     borderWidth: 1,
     marginBottom: 12,
-    padding: 15
+    padding: 18
   },
   nextActionTitle: {
     color: colors.ink,
@@ -2463,6 +2531,71 @@ return StyleSheet.create({
   tabButtonTextActive: {
     color: colors.onAccent
   },
+  patientTabBar: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 24,
+    borderWidth: 1,
+    flexDirection: "row",
+    marginBottom: 8,
+    marginHorizontal: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 7,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16
+  },
+  patientTabButton: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 50,
+    paddingHorizontal: 2,
+    paddingVertical: 4
+  },
+  patientTabIcon: { color: colors.mutedSoft, fontSize: 20, fontWeight: "900", lineHeight: 22 },
+  patientTabIconActive: { color: colors.accent },
+  patientTabLabel: { color: colors.muted, fontSize: 9, fontWeight: "700", marginTop: 2 },
+  patientTabLabelActive: { color: colors.accent, fontWeight: "900" },
+  quickActionsSection: { marginBottom: 16 },
+  homeSectionTitle: { color: colors.ink, fontSize: 19, fontWeight: "900", letterSpacing: -0.4, marginBottom: 12 },
+  quickActionsGrid: { flexDirection: "row", gap: 9 },
+  quickActionCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 19,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 132,
+    padding: 12
+  },
+  quickActionIcon: {
+    alignItems: "center",
+    backgroundColor: colors.accentMuted,
+    borderRadius: 13,
+    height: 34,
+    justifyContent: "center",
+    marginBottom: 12,
+    width: 34
+  },
+  quickActionIconText: { color: colors.accentDark, fontSize: 20, fontWeight: "900", lineHeight: 22 },
+  quickActionTitle: { color: colors.ink, fontSize: 13, fontWeight: "900", lineHeight: 17, marginBottom: 4 },
+  quickActionDetail: { color: colors.muted, fontSize: 10, lineHeight: 14 },
+  activityPreview: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 12,
+    padding: 16
+  },
+  activityPreviewTitle: { color: colors.ink, fontSize: 15, fontWeight: "900", marginBottom: 4 },
+  activityPreviewBody: { color: colors.muted, fontSize: 12, lineHeight: 17 },
+  activityPreviewArrow: { color: colors.accent, fontSize: 30, fontWeight: "500" },
   rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
