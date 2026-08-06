@@ -27,7 +27,12 @@ import {
   type PatientAccessForm
 } from "./src/onboarding";
 import { addForegroundNotificationListener, registerForPushNotificationsAsync } from "./src/push";
-import { canUsePatientProduct, patientProductAccessMessage } from "./src/product";
+import {
+  canUseMobileProduct,
+  nurseProductAccessMessage,
+  patientProductAccessMessage,
+  type MobileProductId
+} from "./src/product";
 import { getSupabaseClient } from "./src/supabase";
 import { lightColors, type ThemeColors } from "./src/theme";
 import type {
@@ -682,9 +687,10 @@ function RequestProgress({ step }: { step: RequestStep }) {
   );
 }
 
-export default function App() {
+export default function App({ product = "patient" }: { product?: MobileProductId }) {
   colors = lightColors;
   styles = createStyles(colors);
+  const isNurseProduct = product === "nurse";
   const supabase = useMemo(() => getSupabaseClient(), []);
   const [baseUrl, setBaseUrl] = useState("");
   const [session, setSession] = useState<Session | null>(null);
@@ -1397,8 +1403,8 @@ export default function App() {
         <Animated.View style={[styles.splashMark, { opacity: splashOpacity, transform: [{ scale: splashScale }] }]}>
           <Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.splashImage} />
         </Animated.View>
-        <Text style={styles.splashName}>NurseBridges</Text>
-        <Text style={styles.meta}>Care is on the way.</Text>
+        <Text style={styles.splashName}>{isNurseProduct ? "NurseBridges Care" : "NurseBridges"}</Text>
+        <Text style={styles.meta}>{isNurseProduct ? "Your workday, connected." : "Care is on the way."}</Text>
       </SafeAreaView>
     );
   }
@@ -1411,14 +1417,18 @@ export default function App() {
     );
   }
 
-  if (session && role && !canUsePatientProduct(role)) {
+  if (session && role && !canUseMobileProduct(product, role)) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.productGate}>
           <Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.productGateLogo} />
           <Text style={styles.eyebrow}>Account destination</Text>
-          <Text style={styles.productGateTitle}>You’re signed in to the Patient app</Text>
-          <Text style={styles.productGateBody}>{patientProductAccessMessage(role)}</Text>
+          <Text style={styles.productGateTitle}>
+            You’re signed in to the {isNurseProduct ? "Care" : "Patient"} app
+          </Text>
+          <Text style={styles.productGateBody}>
+            {isNurseProduct ? nurseProductAccessMessage(role) : patientProductAccessMessage(role)}
+          </Text>
           <Text style={styles.productGateHint}>
             Your account and data are unchanged. Sign out here, then use the correct NurseBridges product.
           </Text>
@@ -1454,34 +1464,44 @@ export default function App() {
               <View style={styles.loginTopRow}>
                 <Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.loginLogo} />
               </View>
-              <Text style={styles.loginBrandName}>NurseBridges</Text>
-              <Text style={styles.loginHeroTitle}>Care coordination that feels clear.</Text>
+              <Text style={styles.loginBrandName}>{isNurseProduct ? "NurseBridges Care" : "NurseBridges"}</Text>
+              <Text style={styles.loginHeroTitle}>
+                {isNurseProduct ? "Care work, clearly organized." : "Care coordination that feels clear."}
+              </Text>
               <Text style={styles.loginHeroBody}>
-                Request trusted support, follow every update, and keep the people you care about informed.
+                {isNurseProduct
+                  ? "Manage opportunities, credentials, assigned visits, and updates in one professional workspace."
+                  : "Request trusted support, follow every update, and keep the people you care about informed."}
               </Text>
             </View>
             {error ? <ErrorNotice message={error} onCopy={copyErrorDetails} /> : null}
 
             {entryScreen === "welcome" ? (
               <View style={styles.loginCard}>
-                <Text style={styles.eyebrow}>Patient and family</Text>
-                <Text style={styles.loginTitle}>Start with what you need</Text>
+                <Text style={styles.eyebrow}>{isNurseProduct ? "Nurses and caregivers" : "Patient and family"}</Text>
+                <Text style={styles.loginTitle}>
+                  {isNurseProduct ? "Your care-work companion" : "Start with what you need"}
+                </Text>
                 <Text style={styles.sectionIntro}>
-                  Join the closed beta or return to an existing NurseBridges account.
+                  {isNurseProduct
+                    ? "Return to your invited professional account or review how closed-beta access works."
+                    : "Join the closed beta or return to an existing NurseBridges account."}
                 </Text>
                 <TouchableOpacity
                   accessibilityRole="button"
                   style={styles.entryPrimaryButton}
-                  onPress={() => showEntryScreen("start")}
+                  onPress={() => showEntryScreen(isNurseProduct ? "signin" : "start")}
                 >
-                  <Text style={styles.entryPrimaryButtonText}>Get started</Text>
+                  <Text style={styles.entryPrimaryButtonText}>{isNurseProduct ? "Sign in" : "Get started"}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   accessibilityRole="button"
                   style={styles.entrySecondaryButton}
-                  onPress={() => showEntryScreen("signin")}
+                  onPress={() => showEntryScreen(isNurseProduct ? "start" : "signin")}
                 >
-                  <Text style={styles.entrySecondaryButtonText}>Sign in</Text>
+                  <Text style={styles.entrySecondaryButtonText}>
+                    {isNurseProduct ? "How professional access works" : "Sign in"}
+                  </Text>
                 </TouchableOpacity>
                 <Text style={styles.loginSafety}>Not for emergencies. For urgent needs, contact local emergency services.</Text>
               </View>
@@ -1492,25 +1512,31 @@ export default function App() {
                 <TouchableOpacity accessibilityRole="button" onPress={() => showEntryScreen("welcome")}>
                   <Text style={styles.backLink}>‹ Back</Text>
                 </TouchableOpacity>
-                <Text style={styles.eyebrow}>Closed beta access</Text>
-                <Text style={styles.loginTitle}>How would you like to continue?</Text>
+                <Text style={styles.eyebrow}>{isNurseProduct ? "Professional access" : "Closed beta access"}</Text>
+                <Text style={styles.loginTitle}>
+                  {isNurseProduct ? "Invitation, verification, activation" : "How would you like to continue?"}
+                </Text>
                 <Text style={styles.sectionIntro}>
-                  Invitations unlock an existing account. New patients and families can request early access without sharing care details.
+                  {isNurseProduct
+                    ? "NurseBridges Care is invitation-only during this beta. Sign in, complete requested credential steps, and wait for activation before opportunities become available."
+                    : "Invitations unlock an existing account. New patients and families can request early access without sharing care details."}
                 </Text>
                 <TouchableOpacity
                   accessibilityRole="button"
                   style={styles.entryPrimaryButton}
                   onPress={() => showEntryScreen("signin")}
                 >
-                  <Text style={styles.entryPrimaryButtonText}>I have an invitation</Text>
+                  <Text style={styles.entryPrimaryButtonText}>
+                    {isNurseProduct ? "Continue to professional sign in" : "I have an invitation"}
+                  </Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                {!isNurseProduct ? <TouchableOpacity
                   accessibilityRole="button"
                   style={styles.entrySecondaryButton}
                   onPress={() => showEntryScreen("access")}
                 >
                   <Text style={styles.entrySecondaryButtonText}>Request early access</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> : null}
               </View>
             ) : null}
 
@@ -1519,9 +1545,11 @@ export default function App() {
                 <TouchableOpacity accessibilityRole="button" onPress={() => showEntryScreen("welcome")}>
                   <Text style={styles.backLink}>‹ Back</Text>
                 </TouchableOpacity>
-                <Text style={styles.eyebrow}>Secure patient access</Text>
+                <Text style={styles.eyebrow}>{isNurseProduct ? "Secure professional access" : "Secure patient access"}</Text>
                 <Text style={styles.loginTitle}>Welcome back</Text>
-                <Text style={styles.sectionIntro}>Sign in with the account from your NurseBridges invitation.</Text>
+                <Text style={styles.sectionIntro}>
+                  Sign in with the account from your {isNurseProduct ? "NurseBridges Care" : "NurseBridges"} invitation.
+                </Text>
                 <Text style={styles.inputLabel}>Email</Text>
                 <TextInput
                   accessibilityLabel="Email address"
@@ -1568,7 +1596,7 @@ export default function App() {
               </View>
             ) : null}
 
-            {entryScreen === "access" ? (
+            {entryScreen === "access" && !isNurseProduct ? (
               <View style={styles.loginCard}>
                 <TouchableOpacity accessibilityRole="button" onPress={() => showEntryScreen("start")}>
                   <Text style={styles.backLink}>‹ Back</Text>
@@ -1706,11 +1734,22 @@ export default function App() {
           <View style={styles.brandRow}>
             <View style={styles.brandIdentity}>
               <View style={styles.headerLogoWrap}><Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.headerLogo} /></View>
-              <View><Text style={styles.brandName}>NurseBridges</Text><Text style={styles.brandCaption}>Care, connected.</Text></View>
+              <View>
+                <Text style={styles.brandName}>{isNurseProduct ? "NurseBridges Care" : "NurseBridges"}</Text>
+                <Text style={styles.brandCaption}>
+                  {isNurseProduct ? "Professional care workspace." : "Care, connected."}
+                </Text>
+              </View>
             </View>
           </View>
-          <Text style={styles.title}>Your care,{"\u00A0"}in one place</Text>
-          <Text style={styles.subTitle}>Request support and see what is happening next.</Text>
+          <Text style={styles.title}>
+            {isNurseProduct ? "Your care work," : "Your care,"}{"\u00A0"}in one place
+          </Text>
+          <Text style={styles.subTitle}>
+            {isNurseProduct
+              ? "Review opportunities, manage assignments, and stay ready for what comes next."
+              : "Request support and see what is happening next."}
+          </Text>
           <View style={styles.headerStatusRow}>
             <View style={styles.headerStatusCopy}>
               <Text style={styles.headerStatusLabel}>Current status</Text>

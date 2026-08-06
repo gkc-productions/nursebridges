@@ -6,6 +6,7 @@ node_modules
 apps/mobile/.expo
 apps/mobile/dist
 apps/mobile/web-build
+apps/nurse/.expo
 
 # Next
 apps/admin/.next
