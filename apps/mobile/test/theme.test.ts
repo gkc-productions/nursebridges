@@ -1,18 +1,18 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import test from "node:test";
-import { darkColors, lightColors, resolveThemeMode, toggledThemeMode } from "../src/theme";
+import { fileURLToPath } from "node:url";
+import { lightColors } from "../src/theme";
 
-test("theme follows the system on first launch", () => {
-  assert.equal(resolveThemeMode("dark"), "dark");
-  assert.equal(resolveThemeMode("light"), "light");
-  assert.equal(resolveThemeMode(null), "light");
+test("the product UI uses one polished light palette", () => {
+  assert.equal(lightColors.background, "#F3F6F5");
+  assert.equal(lightColors.surface, "#FFFFFF");
+  assert.ok(lightColors.heroText);
 });
 
-test("theme toggle switches between complete palettes", () => {
-  assert.equal(toggledThemeMode("light"), "dark");
-  assert.equal(toggledThemeMode("dark"), "light");
-  assert.notEqual(lightColors.background, darkColors.background);
-  assert.notEqual(lightColors.surface, darkColors.surface);
-  assert.ok(lightColors.heroText);
-  assert.ok(darkColors.heroText);
+test("the Patient app does not expose an in-app appearance switch", () => {
+  const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../App.tsx"), "utf8");
+  assert.doesNotMatch(source, /toggleTheme|useColorScheme|Use dark appearance|Use light appearance/);
+  assert.match(source, /automaticallyAdjustKeyboardInsets/);
 });

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import {
@@ -10,16 +10,15 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  useColorScheme,
   View
 } from "react-native";
 import type { Session } from "@supabase/supabase-js";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { apiFetch, apiPublicFetch, formatApiErrorMessage } from "./src/api";
 import { loadApiConfig } from "./src/env";
 import {
@@ -30,14 +29,7 @@ import {
 import { addForegroundNotificationListener, registerForPushNotificationsAsync } from "./src/push";
 import { canUsePatientProduct, patientProductAccessMessage } from "./src/product";
 import { getSupabaseClient } from "./src/supabase";
-import {
-  darkColors,
-  lightColors,
-  resolveThemeMode,
-  toggledThemeMode,
-  type ThemeColors,
-  type ThemeMode
-} from "./src/theme";
+import { lightColors, type ThemeColors } from "./src/theme";
 import type {
   ApplicationListResponse,
   ApplicationRow,
@@ -81,8 +73,6 @@ type PatientTab = "home" | "new" | "records" | "updates" | "account";
 type NurseTab = "home" | "open" | "work" | "verification" | "updates" | "account";
 type EntryScreen = "welcome" | "start" | "signin" | "access" | "submitted";
 type RequestStep = 1 | 2 | 3;
-
-const THEME_STORAGE_KEY = "nursebridges.theme";
 
 let colors: ThemeColors = lightColors;
 let styles = createStyles(colors);
@@ -479,12 +469,12 @@ function PatientTabBar({
   activeTab: PatientTab;
   onChange: (tab: PatientTab) => void;
 }) {
-  const tabs: Array<{ key: PatientTab; label: string; icon: string }> = [
-    { key: "home", label: "Home", icon: "⌂" },
-    { key: "new", label: "Request", icon: "+" },
-    { key: "records", label: "Activity", icon: "≡" },
-    { key: "updates", label: "Updates", icon: "•" },
-    { key: "account", label: "Profile", icon: "○" }
+  const tabs: Array<{ key: PatientTab; label: string; icon: React.ComponentProps<typeof Ionicons>["name"] }> = [
+    { key: "home", label: "Home", icon: "home-outline" },
+    { key: "new", label: "Request", icon: "add-circle-outline" },
+    { key: "records", label: "Activity", icon: "receipt-outline" },
+    { key: "updates", label: "Updates", icon: "notifications-outline" },
+    { key: "account", label: "Profile", icon: "person-circle-outline" }
   ];
 
   return (
@@ -500,7 +490,11 @@ function PatientTabBar({
             style={styles.patientTabButton}
             onPress={() => onChange(tab.key)}
           >
-            <Text style={[styles.patientTabIcon, isActive ? styles.patientTabIconActive : null]}>{tab.icon}</Text>
+            <Ionicons
+              name={tab.icon}
+              size={21}
+              style={[styles.patientTabIcon, isActive ? styles.patientTabIconActive : null]}
+            />
             <Text style={[styles.patientTabLabel, isActive ? styles.patientTabLabelActive : null]}>{tab.label}</Text>
           </TouchableOpacity>
         );
@@ -521,12 +515,12 @@ function PatientQuickActions({
   onUpdates: () => void;
 }) {
   const actions = [
-    { label: "Request care", detail: "Tell us what you need", symbol: "+", onPress: onRequest },
-    { label: "View activity", detail: "Follow every request", symbol: "≡", onPress: onActivity },
+    { label: "Request care", detail: "Tell us what you need", icon: "add-circle-outline", onPress: onRequest },
+    { label: "View activity", detail: "Follow every request", icon: "receipt-outline", onPress: onActivity },
     {
       label: "Updates",
       detail: unreadCount > 0 ? `${unreadCount} new ${unreadCount === 1 ? "message" : "messages"}` : "You're all caught up",
-      symbol: "•",
+      icon: "notifications-outline",
       onPress: onUpdates
     }
   ];
@@ -542,7 +536,13 @@ function PatientQuickActions({
             style={styles.quickActionCard}
             onPress={action.onPress}
           >
-            <View style={styles.quickActionIcon}><Text style={styles.quickActionIconText}>{action.symbol}</Text></View>
+            <View style={styles.quickActionIcon}>
+              <Ionicons
+                name={action.icon as React.ComponentProps<typeof Ionicons>["name"]}
+                size={20}
+                color={colors.accentDark}
+              />
+            </View>
             <Text style={styles.quickActionTitle}>{action.label}</Text>
             <Text style={styles.quickActionDetail}>{action.detail}</Text>
           </TouchableOpacity>
@@ -683,9 +683,7 @@ function RequestProgress({ step }: { step: RequestStep }) {
 }
 
 export default function App() {
-  const systemScheme = useColorScheme();
-  const [themeMode, setThemeMode] = useState<ThemeMode>(() => resolveThemeMode(systemScheme));
-  colors = themeMode === "dark" ? darkColors : lightColors;
+  colors = lightColors;
   styles = createStyles(colors);
   const supabase = useMemo(() => getSupabaseClient(), []);
   const [baseUrl, setBaseUrl] = useState("");
@@ -717,26 +715,13 @@ export default function App() {
   const [jobForm, setJobForm] = useState(emptyJobForm);
   const [verificationDocumentType, setVerificationDocumentType] = useState("license");
   const lastAutoLoadKey = useRef<string | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
   const passwordInputRef = useRef<TextInput>(null);
   const splashScale = useRef(new Animated.Value(0.82)).current;
   const splashOpacity = useRef(new Animated.Value(0.35)).current;
 
-  useEffect(() => {
-    let active = true;
-    void AsyncStorage.getItem(THEME_STORAGE_KEY).then((storedTheme) => {
-      if (active && (storedTheme === "light" || storedTheme === "dark")) {
-        setThemeMode(storedTheme);
-      }
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  function toggleTheme() {
-    const nextTheme = toggledThemeMode(themeMode);
-    setThemeMode(nextTheme);
-    void AsyncStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+  function revealActiveForm() {
+    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
   }
 
   useEffect(() => {
@@ -1455,7 +1440,10 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        ref={scrollViewRef}
+        contentContainerStyle={[styles.content, session && role === "patient" ? styles.patientContent : null]}
+        automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+        contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
@@ -1465,14 +1453,6 @@ export default function App() {
             <View style={styles.loginHero}>
               <View style={styles.loginTopRow}>
                 <Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.loginLogo} />
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel={`Use ${themeMode === "dark" ? "light" : "dark"} appearance`}
-                  style={styles.themeButton}
-                  onPress={toggleTheme}
-                >
-                  <Text style={styles.themeButtonText}>{themeMode === "dark" ? "Light" : "Dark"}</Text>
-                </TouchableOpacity>
               </View>
               <Text style={styles.loginBrandName}>NurseBridges</Text>
               <Text style={styles.loginHeroTitle}>Care coordination that feels clear.</Text>
@@ -1554,6 +1534,7 @@ export default function App() {
                   keyboardType="email-address"
                   textContentType="emailAddress"
                   returnKeyType="next"
+                  onFocus={revealActiveForm}
                   onSubmitEditing={() => passwordInputRef.current?.focus()}
                   value={email}
                   onChangeText={setEmail}
@@ -1569,6 +1550,7 @@ export default function App() {
                   secureTextEntry
                   textContentType="password"
                   returnKeyType="go"
+                  onFocus={revealActiveForm}
                   onSubmitEditing={handleSignIn}
                   value={password}
                   onChangeText={setPassword}
@@ -1606,6 +1588,7 @@ export default function App() {
                   autoCapitalize="words"
                   autoComplete="name"
                   textContentType="name"
+                  onFocus={revealActiveForm}
                   value={accessForm.fullName}
                   onChangeText={(value) => updateAccessForm("fullName", value)}
                 />
@@ -1620,6 +1603,7 @@ export default function App() {
                   autoComplete="email"
                   keyboardType="email-address"
                   textContentType="emailAddress"
+                  onFocus={revealActiveForm}
                   value={accessForm.email}
                   onChangeText={(value) => updateAccessForm("email", value)}
                 />
@@ -1632,6 +1616,7 @@ export default function App() {
                   autoComplete="tel"
                   keyboardType="phone-pad"
                   textContentType="telephoneNumber"
+                  onFocus={revealActiveForm}
                   value={accessForm.phone}
                   onChangeText={(value) => updateAccessForm("phone", value)}
                 />
@@ -1642,6 +1627,7 @@ export default function App() {
                   placeholder="Your general service area"
                   placeholderTextColor={colors.mutedSoft}
                   autoCapitalize="words"
+                  onFocus={revealActiveForm}
                   value={accessForm.serviceArea}
                   onChangeText={(value) => updateAccessForm("serviceArea", value)}
                 />
@@ -1722,11 +1708,8 @@ export default function App() {
               <View style={styles.headerLogoWrap}><Image source={require("./assets/brand/nursebridge-mark.png")} style={styles.headerLogo} /></View>
               <View><Text style={styles.brandName}>NurseBridges</Text><Text style={styles.brandCaption}>Care, connected.</Text></View>
             </View>
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Use ${themeMode === "dark" ? "light" : "dark"} appearance`} onPress={toggleTheme}>
-              <Text style={styles.environmentTag}>{themeMode === "dark" ? "Light" : "Dark"}</Text>
-            </TouchableOpacity>
           </View>
-          <Text style={styles.title}>Your care, in one place</Text>
+          <Text style={styles.title}>Your care,{"\u00A0"}in one place</Text>
           <Text style={styles.subTitle}>Request support and see what is happening next.</Text>
           <View style={styles.headerStatusRow}>
             <View style={styles.headerStatusCopy}>
@@ -1779,7 +1762,7 @@ export default function App() {
                   onUpdates={() => setPatientTab("updates")}
                 />
                 <NextActionPanel
-                  eyebrow="Next step"
+                  eyebrow={patientFocusJob && ["completed", "cancelled"].includes(patientFocusJob.status) ? "Latest request" : "Next step"}
                   title={patientFocusJob ? patientFocusJob.title : "Create the first care request"}
                   status={patientFocusJob?.status}
                   body={
@@ -2361,6 +2344,9 @@ return StyleSheet.create({
     padding: 16,
     paddingBottom: 28
   },
+  patientContent: {
+    paddingBottom: 110
+  },
   headerPanel: {
     backgroundColor: colors.hero,
     borderRadius: 28,
@@ -2391,16 +2377,6 @@ return StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     marginTop: 2
-  },
-  environmentTag: {
-    backgroundColor: colors.accentMuted,
-    borderRadius: 999,
-    color: colors.accentDark,
-    fontSize: 11,
-    fontWeight: "800",
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    textTransform: "uppercase"
   },
   title: {
     fontSize: 30,
@@ -2572,8 +2548,6 @@ return StyleSheet.create({
   loginBrandName: { color: colors.heroMuted, fontSize: 15, fontWeight: "800", marginBottom: 22 },
   loginHeroTitle: { color: colors.heroText, fontSize: 32, fontWeight: "900", letterSpacing: -1.2, lineHeight: 37, marginBottom: 12, maxWidth: 310 },
   loginHeroBody: { color: colors.heroMuted, fontSize: 15, lineHeight: 22, maxWidth: 340 },
-  themeButton: { backgroundColor: colors.heroSurface, borderColor: colors.heroBorder, borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },
-  themeButtonText: { color: colors.heroText, fontSize: 12, fontWeight: "800" },
   loginCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 26, borderWidth: 1, marginBottom: 14, padding: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 24 },
   loginTitle: { color: colors.ink, fontSize: 25, fontWeight: "900", letterSpacing: -0.8 },
   loginSafety: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 14, textAlign: "center" },
@@ -2748,7 +2722,7 @@ return StyleSheet.create({
     paddingHorizontal: 2,
     paddingVertical: 4
   },
-  patientTabIcon: { color: colors.mutedSoft, fontSize: 20, fontWeight: "900", lineHeight: 22 },
+  patientTabIcon: { color: colors.mutedSoft },
   patientTabIconActive: { color: colors.accent },
   patientTabLabel: { color: colors.muted, fontSize: 9, fontWeight: "700", marginTop: 2 },
   patientTabLabelActive: { color: colors.accent, fontWeight: "900" },
@@ -3087,8 +3061,10 @@ return StyleSheet.create({
   fieldValue: {
     color: colors.ink,
     flex: 1.4,
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: "700",
+    minWidth: 0,
     textAlign: "right"
   },
   errorBox: {

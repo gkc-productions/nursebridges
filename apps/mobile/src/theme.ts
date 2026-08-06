@@ -8,24 +8,5 @@ export const lightColors = {
   heroMuted: "#B9C8CE", onAccent: "#FFFFFF"
 } as const;
 
-export const darkColors = {
-  background: "#090F0D", surface: "#131B18", surfaceMuted: "#1B2521", border: "#293731",
-  borderStrong: "#43564F", ink: "#F5F9F7", inkSoft: "#D5DFDB", muted: "#9DAAA5",
-  mutedSoft: "#74817C", accent: "#42C9B8", accentDark: "#B7FFF4", accentMuted: "#173D38",
-  blue: "#8EACF3", blueMuted: "#1C2C50", warning: "#F5B65C", warningMuted: "#3D2C13",
-  danger: "#FF9A88", dangerMuted: "#451F1A", success: "#72D9A8", successMuted: "#163A29",
-  hero: "#0D1513", heroSurface: "#18241F", heroBorder: "#31433C", heroText: "#F7FBF9",
-  heroMuted: "#AEBDB7", onAccent: "#071512"
-} as const;
-
 export type ThemeColors = { [K in keyof typeof lightColors]: string };
-export type ThemeMode = "light" | "dark";
 export const colors = lightColors;
-
-export function resolveThemeMode(systemScheme: "light" | "dark" | null | undefined): ThemeMode {
-  return systemScheme === "dark" ? "dark" : "light";
-}
-
-export function toggledThemeMode(mode: ThemeMode): ThemeMode {
-  return mode === "dark" ? "light" : "dark";
-}

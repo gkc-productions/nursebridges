@@ -37,7 +37,8 @@ assert(packageJson.scripts["ios:release-check"], "package.json must expose ios:r
 assert(packageJson.scripts["ios:install-preflight"], "package.json must expose ios:install-preflight");
 
 for (const relativePath of [
-  "assets/icon.png",
+  "assets/icon-light.png",
+  "assets/icon-dark.png",
   "assets/splash.png",
   "ios/NurseBridge.xcworkspace",
   "ios/NurseBridge.xcodeproj",
@@ -45,7 +46,8 @@ for (const relativePath of [
   "ios/Podfile.lock",
   "ios/ExportOptions.development.plist",
   "ios/ExportOptions.testflight.plist",
-  "ios/NurseBridge/Images.xcassets/AppIcon.appiconset/App-Icon-1024x1024@1x.png"
+  "ios/NurseBridge/Images.xcassets/AppIcon.appiconset/App-Icon-1024x1024-light.png",
+  "ios/NurseBridge/Images.xcassets/AppIcon.appiconset/App-Icon-1024x1024-dark.png"
 ]) {
   assert(exists(relativePath), `${relativePath} is required for iOS release readiness`);
 }
@@ -55,8 +57,8 @@ assertIncludes(appConfig, 'slug: "nursebridges"', "app.config.ts");
 assertIncludes(appConfig, 'scheme: "nursebridges"', "app.config.ts");
 assertIncludes(appConfig, 'bundleIdentifier: "com.nursebridges.mobile"', "app.config.ts");
 assertIncludes(appConfig, 'package: "com.nursebridges.mobile"', "app.config.ts");
-assertIncludes(appConfig, 'buildNumber: "3"', "app.config.ts");
-assertIncludes(appConfig, 'icon: "./assets/icon.png"', "app.config.ts");
+assertIncludes(appConfig, 'buildNumber: "4"', "app.config.ts");
+assertIncludes(appConfig, 'icon: "./assets/icon-light.png"', "app.config.ts");
 assertIncludes(appConfig, 'image: "./assets/splash.png"', "app.config.ts");
 assertIncludes(appConfig, "ITSAppUsesNonExemptEncryption: false", "app.config.ts");
 
@@ -73,7 +75,7 @@ assertIncludes(infoPlist, "ITSAppUsesNonExemptEncryption", "Info.plist");
 assertIncludes(infoPlist, "NurseBridges uses Face ID only", "Info.plist");
 
 assertIncludes(project, "MARKETING_VERSION = 0.1.0;", "project.pbxproj");
-assertIncludes(project, "CURRENT_PROJECT_VERSION = 3;", "project.pbxproj");
+assertIncludes(project, "CURRENT_PROJECT_VERSION = 4;", "project.pbxproj");
 assertIncludes(project, "REACT_NATIVE_XCODE_SCRIPT", "project.pbxproj");
 assertIncludes(project, 'BUNDLE_COMMAND=\\"export:embed\\"', "project.pbxproj");
 assert(!project.includes("export SKIP_BUNDLING=1"), "physical iPhone Debug builds must not force SKIP_BUNDLING=1");

@@ -9,8 +9,8 @@ export default {
     scheme: "nursebridges",
     version: "0.1.0",
     orientation: "portrait",
-    icon: "./assets/icon.png",
-    userInterfaceStyle: "automatic",
+    icon: "./assets/icon-light.png",
+    userInterfaceStyle: "light",
     plugins: ["expo-secure-store"],
     splash: {
       image: "./assets/splash.png",
@@ -19,9 +19,9 @@ export default {
     },
     ios: {
       bundleIdentifier: "com.nursebridges.mobile",
-      buildNumber: "3",
+      buildNumber: "4",
       supportsTablet: false,
-      icon: "./assets/icon.png",
+      icon: "./assets/icon-light.png",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSFaceIDUsageDescription:
@@ -32,8 +32,8 @@ export default {
       package: "com.nursebridges.mobile",
       versionCode: 1,
       adaptiveIcon: {
-        foregroundImage: "./assets/icon.png",
-        backgroundColor: "#101820"
+        foregroundImage: "./assets/icon-light.png",
+        backgroundColor: "#EAFBF7"
       },
       permissions: ["POST_NOTIFICATIONS"]
     },
