@@ -40,6 +40,8 @@ function formatRate(value: number | null) {
 export default function JobsPage() {
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<"active" | "open" | "assigned" | "all">("active");
 
   useEffect(() => {
     const load = async () => {
@@ -69,11 +71,32 @@ export default function JobsPage() {
     void load();
   }, []);
 
+  const visibleJobs = jobs.filter((job) => {
+    const matchesFilter = filter === "all"
+      || (filter === "active" && (job.status === "open" || job.status === "assigned"))
+      || job.status === filter;
+    const haystack = `${job.title} ${job.patient_name ?? ""} ${job.nurse_name ?? ""} ${job.address ?? ""}`.toLowerCase();
+    return matchesFilter && haystack.includes(query.trim().toLowerCase());
+  });
+
+  const openCount = jobs.filter((job) => job.status === "open").length;
+  const assignedCount = jobs.filter((job) => job.status === "assigned").length;
+
   return (
-    <section>
-      <h2>Request Queue</h2>
+    <>
+    <section className="page-intro">
+      <div><p className="eyebrow">Dispatch</p><h2>Care request queue</h2><p>Review incoming needs, compare approved applicants, and follow active care through completion.</p></div>
+      <div className="compact-stats"><span><strong>{openCount}</strong><small>Need review</small></span><span><strong>{assignedCount}</strong><small>In progress</small></span><span><strong>{jobs.length}</strong><small>All records</small></span></div>
+    </section>
+    <section className="data-section">
+      <div className="queue-toolbar">
+        <div className="segmented" aria-label="Filter care requests">
+          {(["active", "open", "assigned", "all"] as const).map((option) => <button className={filter === option ? "active" : ""} key={option} onClick={() => setFilter(option)}>{option}</button>)}
+        </div>
+        <label className="search-field"><span>⌕</span><input aria-label="Search requests" placeholder="Search requests" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+      </div>
       {error ? <p className="notice">{error}</p> : null}
-      <table>
+      <div className="table-shell"><table>
         <thead>
           <tr>
             <th>Status</th>
@@ -88,7 +111,7 @@ export default function JobsPage() {
           </tr>
         </thead>
         <tbody>
-          {jobs.map((job) => (
+          {visibleJobs.map((job) => (
             <tr key={job.id}>
               <td>
                 <span className="badge">{job.status}</span>
@@ -104,12 +127,14 @@ export default function JobsPage() {
               <td>{job.nurse_name ?? "-"}</td>
               <td>{formatDateTime(job.created_at)}</td>
               <td>
-                <Link href={`/jobs/${job.id}`}>{job.status === "open" ? "Review" : "Open"}</Link>
+                <Link className="row-action" href={`/jobs/${job.id}`}>{job.status === "open" ? "Review" : "Open"} <span>›</span></Link>
               </td>
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
+      {visibleJobs.length === 0 && !error ? <div className="empty-state centered"><strong>No matching requests</strong><p>Try another status or search term.</p></div> : null}
     </section>
+    </>
   );
 }

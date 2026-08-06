@@ -81,14 +81,16 @@ export default function NursesPage() {
   };
 
   return (
-    <section>
-      <h2>Nurse Verification</h2>
-      <p>
-        Review submitted metadata without exposing private storage paths. Approval records beta eligibility only; it
-        does not claim background-check or license-verification completion.
-      </p>
+    <>
+    <section className="page-intro">
+      <div><p className="eyebrow">Trust & safety</p><h2>Professional credentialing</h2><p>Review closed-beta eligibility while keeping documents private and every decision auditable.</p></div>
+      <div className="compact-stats"><span><strong>{nurses.filter((nurse) => nurse.verification_status === "pending").length}</strong><small>Pending</small></span><span><strong>{nurses.filter((nurse) => nurse.verification_status === "approved").length}</strong><small>Approved</small></span><span><strong>{nurses.length}</strong><small>Total</small></span></div>
+    </section>
+    <section className="data-section">
+      <div className="section-heading"><div><p className="eyebrow">Review queue</p><h2>Credential decisions</h2></div><span className="privacy-pill">Private documents</span></div>
+      <p className="section-note">Review submitted metadata without exposing private storage paths. Approval records beta eligibility only; it does not claim background-check or license-verification completion.</p>
       {error ? <p className="notice">{error}</p> : null}
-      <table>
+      <div className="table-shell"><table>
         <thead>
           <tr>
             <th>Name</th>
@@ -102,7 +104,7 @@ export default function NursesPage() {
         <tbody>
           {nurses.map((nurse) => (
             <tr key={nurse.id}>
-              <td>{nurse.profile_name ?? "-"}</td>
+              <td><strong>{nurse.profile_name ?? "Unnamed professional"}</strong><div className="table-meta">Joined {new Date(nurse.created_at).toLocaleDateString()}</div></td>
               <td>{nurse.license_number ?? "-"}</td>
               <td>
                 {(documentsByNurse[nurse.id] ?? []).length === 0
@@ -118,25 +120,26 @@ export default function NursesPage() {
               </td>
               <td>{nurse.verified_at ? new Date(nurse.verified_at).toLocaleDateString() : "-"}</td>
               <td>
-                <button
-                  className="button"
+                <div className="inline-actions"><button
+                  className="button compact"
                   onClick={() => updateVerification(nurse.id, "approved")}
                   disabled={loading}
                 >
                   Approve
                 </button>
                 <button
-                  className="button secondary"
+                  className="button secondary compact"
                   onClick={() => updateVerification(nurse.id, "rejected")}
                   disabled={loading}
                 >
                   Reject
-                </button>
+                </button></div>
               </td>
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </section>
+    </>
   );
 }

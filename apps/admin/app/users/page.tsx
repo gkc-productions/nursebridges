@@ -36,10 +36,15 @@ export default function UsersPage() {
   }, []);
 
   return (
-    <section>
-      <h2>Users</h2>
+    <>
+    <section className="page-intro">
+      <div><p className="eyebrow">Directory</p><h2>People</h2><p>A clear view of every patient, care professional, and operator in the closed beta.</p></div>
+      <div className="compact-stats"><span><strong>{users.filter((user) => user.role === "patient").length}</strong><small>Patients</small></span><span><strong>{users.filter((user) => user.role === "nurse").length}</strong><small>Professionals</small></span><span><strong>{users.filter((user) => user.role === "admin").length}</strong><small>Operators</small></span></div>
+    </section>
+    <section className="data-section">
+      <div className="section-heading"><div><p className="eyebrow">Closed beta</p><h2>People directory</h2></div><span className="privacy-pill">{users.length} profiles</span></div>
       {error ? <p className="notice">{error}</p> : null}
-      <table>
+      <div className="table-shell"><table>
         <thead>
           <tr>
             <th>Name</th>
@@ -51,7 +56,7 @@ export default function UsersPage() {
         <tbody>
           {users.map((user) => (
             <tr key={user.id}>
-              <td>{user.full_name ?? "-"}</td>
+              <td><strong>{user.full_name ?? "Unnamed profile"}</strong><div className="table-meta">ID {user.id.slice(0, 8)}</div></td>
               <td>{user.phone ?? "-"}</td>
               <td>
                 <span className="badge">{user.role}</span>
@@ -60,7 +65,8 @@ export default function UsersPage() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </section>
+    </>
   );
 }
