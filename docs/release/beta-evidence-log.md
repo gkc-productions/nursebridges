@@ -9,6 +9,20 @@ Use `docs/release/beta-evidence-templates.md` when copying a fresh evidence bloc
 
 ## Engineering Evidence
 
+### Redesigned Patient backend and TestFlight build 3
+
+```text
+Date/time: 2026-08-06 01:10
+Timezone: America/New_York
+Runner: Codex with explicit owner approval
+Backend: Applied 20260804013418_add_patient_access_requests.sql, deployed the patient access-request API route, and verified the public health and invalid-request boundaries through api.nursebridges.com without exposing secrets.
+Verification: Root pnpm verify and pnpm run build passed before release; the focused iOS release-readiness guard passed after incrementing the build number.
+Archive: NurseBridges 0.1.0 (3), com.nursebridges.mobile, team HKQJ75SQVF, Xcode 26.6 build 17F113, iPhoneOS 26.5 SDK.
+Upload: App Store Connect accepted the package and reported that it was processing.
+Warnings: Apple reported missing dSYMs for prebuilt React, ReactNativeDependencies, and Hermes frameworks. The warnings did not block upload but reduce symbolication quality for crashes inside those frameworks.
+Result: PASS for backend deployment, stable-Xcode archive validation, and TestFlight upload. Install/device verification remains pending until Apple processing completes.
+```
+
 ### Installed iPhone end-to-end workflow proof
 
 ```text

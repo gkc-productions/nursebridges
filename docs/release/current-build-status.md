@@ -24,7 +24,7 @@ The first production milestone is a controlled closed beta, not public launch.
 
 ## Current Active Blocker
 
-The original installed-iPhone workflow is proven through request creation, nurse application, admin assignment, nurse completion, and patient/nurse in-app notifications. The active release blocker is now the redesigned Patient app: its new public early-access endpoint and database migration are committed locally but not deployed, and the redesigned signed build has not yet been archived, uploaded, or verified through TestFlight.
+The original installed-iPhone workflow is proven through request creation, nurse application, admin assignment, nurse completion, and patient/nurse in-app notifications. The redesigned Patient app's public early-access migration and API route are deployed and publicly verified. NurseBridges `0.1.0 (3)` was archived with stable Xcode 26.6 and uploaded successfully to App Store Connect on 2026-08-06. The active Patient release blocker is Apple processing followed by owner installation and TestFlight verification of the redesigned build.
 
 The cancellation path is still unproven. The verified workflow used the earlier combined engineering build; it does not by itself validate the new separate Patient and Care product releases.
 
@@ -201,10 +201,9 @@ The smoke script now has regression coverage in root `pnpm test`. The script-lev
 
 ## Current Product Priorities
 
-1. Deploy and verify the reviewed public patient-access endpoint/migration before releasing the redesigned Patient app.
-2. Archive, upload, and verify the redesigned Patient app through TestFlight.
-3. Build and release the separate NurseBridges Care app without patient/admin role switching.
-4. Prove the cancellation path and recheck Android before wider beta unless the owner explicitly accepts an iPhone-first limitation.
+1. Wait for NurseBridges `0.1.0 (3)` to finish processing, install it from TestFlight, and verify the redesigned Patient onboarding, sign-in, and early-access paths.
+2. Build and release the separate NurseBridges Care app without patient/admin role switching.
+3. Prove the cancellation path and recheck Android before wider beta unless the owner explicitly accepts an iPhone-first limitation.
 4. Deploy/sync the admin dispatcher console to the VM when ready and prove it with a controlled admin account.
 5. Continue consolidating duplicated lifecycle/dispatcher logic between Fastify and admin server routes.
 6. Expand beta verification scripts.
@@ -222,6 +221,6 @@ The smoke script now has regression coverage in root `pnpm test`. The script-lev
 
 ## Next Priority
 
-Review and apply the committed patient-access migration/API route as one scoped production change, verify it without exposing secrets, then create a new signed Patient archive for `com.nursebridges.mobile` and upload it to TestFlight. Keep the separate NurseBridges Care build and cancellation proof as subsequent focused slices.
+Verify NurseBridges `0.1.0 (3)` after App Store Connect processing by installing it from TestFlight and checking the redesigned Patient onboarding, sign-in, and early-access experience. Keep the separate NurseBridges Care build and cancellation proof as subsequent focused slices.
 
-The latest iOS build review is `docs/release/ios-internal-build-readiness-review-2026-07-17.md`. It records the successful local native Xcode build and the current signed-install blocker.
+The historical iOS build review is `docs/release/ios-internal-build-readiness-review-2026-07-17.md`. Current stable-Xcode/TestFlight evidence is recorded in `docs/release/beta-evidence-log.md`.

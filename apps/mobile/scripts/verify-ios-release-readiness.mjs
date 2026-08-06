@@ -55,7 +55,7 @@ assertIncludes(appConfig, 'slug: "nursebridges"', "app.config.ts");
 assertIncludes(appConfig, 'scheme: "nursebridges"', "app.config.ts");
 assertIncludes(appConfig, 'bundleIdentifier: "com.nursebridges.mobile"', "app.config.ts");
 assertIncludes(appConfig, 'package: "com.nursebridges.mobile"', "app.config.ts");
-assertIncludes(appConfig, 'buildNumber: "2"', "app.config.ts");
+assertIncludes(appConfig, 'buildNumber: "3"', "app.config.ts");
 assertIncludes(appConfig, 'icon: "./assets/icon.png"', "app.config.ts");
 assertIncludes(appConfig, 'image: "./assets/splash.png"', "app.config.ts");
 assertIncludes(appConfig, "ITSAppUsesNonExemptEncryption: false", "app.config.ts");
@@ -73,7 +73,7 @@ assertIncludes(infoPlist, "ITSAppUsesNonExemptEncryption", "Info.plist");
 assertIncludes(infoPlist, "NurseBridges uses Face ID only", "Info.plist");
 
 assertIncludes(project, "MARKETING_VERSION = 0.1.0;", "project.pbxproj");
-assertIncludes(project, "CURRENT_PROJECT_VERSION = 2;", "project.pbxproj");
+assertIncludes(project, "CURRENT_PROJECT_VERSION = 3;", "project.pbxproj");
 assertIncludes(project, "REACT_NATIVE_XCODE_SCRIPT", "project.pbxproj");
 assertIncludes(project, 'BUNDLE_COMMAND=\\"export:embed\\"', "project.pbxproj");
 assert(!project.includes("export SKIP_BUNDLING=1"), "physical iPhone Debug builds must not force SKIP_BUNDLING=1");

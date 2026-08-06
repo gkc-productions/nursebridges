@@ -16,7 +16,7 @@ Reason:
 - Real-device verification-document upload proof is still missing.
 - Backup/restore evidence is missing.
 - Beta access, revocation, and secret-owner evidence are not finalized.
-- The new patient early-access migration/API route is not deployed, and the redesigned Patient build has not been verified through TestFlight.
+- The patient early-access migration/API route is deployed and publicly verified. The redesigned Patient build `0.1.0 (3)` is uploaded and processing, but its TestFlight install and device verification are not complete.
 
 The historical 131-file VM verification package remains documented in `docs/release/pending-vm-verification.md`; it is not evidence for the newer Patient redesign by itself.
 
@@ -106,7 +106,7 @@ Use `docs/release/beta-evidence-templates.md` for copy-ready evidence blocks.
 
 ## Next Best Action
 
-Deploy and verify the reviewed patient-access migration/API route as a scoped production change, then archive and upload the redesigned Patient app to TestFlight. After Patient validation, build the separate NurseBridges Care release and prove cancellation, verification upload, and remaining operational gates.
+Install and verify NurseBridges `0.1.0 (3)` from TestFlight after processing completes. After Patient validation, build the separate NurseBridges Care release and prove cancellation, verification upload, and remaining operational gates.
 
 ## Decision Template
 
