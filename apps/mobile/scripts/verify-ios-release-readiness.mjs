@@ -55,7 +55,7 @@ assertIncludes(appConfig, 'slug: "nursebridges"', "app.config.ts");
 assertIncludes(appConfig, 'scheme: "nursebridges"', "app.config.ts");
 assertIncludes(appConfig, 'bundleIdentifier: "com.nursebridges.mobile"', "app.config.ts");
 assertIncludes(appConfig, 'package: "com.nursebridges.mobile"', "app.config.ts");
-assertIncludes(appConfig, 'buildNumber: "1"', "app.config.ts");
+assertIncludes(appConfig, 'buildNumber: "2"', "app.config.ts");
 assertIncludes(appConfig, 'icon: "./assets/icon.png"', "app.config.ts");
 assertIncludes(appConfig, 'image: "./assets/splash.png"', "app.config.ts");
 assertIncludes(appConfig, "ITSAppUsesNonExemptEncryption: false", "app.config.ts");
@@ -66,14 +66,14 @@ assert(easJson.build["ios-testflight"]?.distribution === "store", "eas.json must
 assert(easJson.build["ios-testflight"]?.ios?.simulator === false, "ios-testflight must target physical devices");
 
 assertIncludes(infoPlist, "<string>0.1.0</string>", "Info.plist");
-assertIncludes(infoPlist, "<string>1</string>", "Info.plist");
+assertIncludes(infoPlist, "<string>$(CURRENT_PROJECT_VERSION)</string>", "Info.plist");
 assertIncludes(infoPlist, "<string>nursebridges</string>", "Info.plist");
 assertIncludes(infoPlist, "<string>com.nursebridges.mobile</string>", "Info.plist");
 assertIncludes(infoPlist, "ITSAppUsesNonExemptEncryption", "Info.plist");
 assertIncludes(infoPlist, "NurseBridges uses Face ID only", "Info.plist");
 
 assertIncludes(project, "MARKETING_VERSION = 0.1.0;", "project.pbxproj");
-assertIncludes(project, "CURRENT_PROJECT_VERSION = 1;", "project.pbxproj");
+assertIncludes(project, "CURRENT_PROJECT_VERSION = 2;", "project.pbxproj");
 assertIncludes(project, "REACT_NATIVE_XCODE_SCRIPT", "project.pbxproj");
 assertIncludes(project, 'BUNDLE_COMMAND=\\"export:embed\\"', "project.pbxproj");
 assert(!project.includes("export SKIP_BUNDLING=1"), "physical iPhone Debug builds must not force SKIP_BUNDLING=1");
