@@ -1,4 +1,5 @@
 import "./globals.css";
+import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import ThemeToggle from "./theme-toggle";
@@ -19,16 +20,24 @@ function NavIcon({ name }: { name: "overview" | "requests" | "careTeam" | "peopl
   return <svg aria-hidden="true" viewBox="0 0 24 24">{paths[name]}</svg>;
 }
 
+function Brand({ compact = false }: { compact?: boolean }) {
+  return (
+    <Link className={compact ? "brand mobile-brand" : "brand"} href="/" aria-label="NurseBridge operations home">
+      <span className="brand-mark">
+        <Image src="/brand/nursebridge-mark.png" alt="" width={50} height={50} priority />
+      </span>
+      <span><strong>NurseBridge</strong><small>Operations center</small></span>
+    </Link>
+  );
+}
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
         <div className="app-shell">
           <aside className="sidebar">
-            <Link className="brand" href="/" aria-label="NurseBridges home">
-              <span className="brand-mark"><img src="/brand/nursebridge-mark.png" alt="" /></span>
-              <span><strong>NurseBridges</strong><small>Operations center</small></span>
-            </Link>
+            <Brand />
             <nav aria-label="Primary navigation">
               <Link href="/"><span><NavIcon name="overview" /></span>Overview</Link>
               <Link href="/jobs"><span><NavIcon name="requests" /></span>Care requests</Link>
@@ -42,7 +51,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </aside>
           <main>
             <header className="topbar">
-              <div><p className="eyebrow">Closed beta · Operations</p><h1>Good morning.</h1></div>
+              <Brand compact />
+              <div className="topbar-title"><p className="eyebrow">Closed beta · Operations</p><h1>Good morning.</h1></div>
               <ThemeToggle />
             </header>
             {children}

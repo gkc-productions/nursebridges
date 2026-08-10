@@ -30,20 +30,22 @@ export default function Dashboard() {
   const [priorityJobs, setPriorityJobs] = useState<JobRow[]>([]);
   const [pendingNurses, setPendingNurses] = useState<NurseRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
         setError(null);
 
-        const overviewRes = await adminFetch("/api/admin/jobs");
+        const [overviewRes, usersRes, nursesRes] = await Promise.all([
+          adminFetch("/api/admin/jobs"),
+          adminFetch("/api/admin/users"),
+          adminFetch("/api/admin/nurses")
+        ]);
         if (!overviewRes.ok) {
           const msg = await overviewRes.text();
           throw new Error(msg || "Failed to load overview");
         }
-
-        const usersRes = await adminFetch("/api/admin/users");
-        const nursesRes = await adminFetch("/api/admin/nurses");
 
         if (!usersRes.ok || !nursesRes.ok) {
           throw new Error("Failed to load dashboard data");
@@ -66,6 +68,8 @@ export default function Dashboard() {
         setPendingNurses(nurses.filter((nurse) => nurse.verification_status === "pending").slice(0, 3));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong");
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -77,8 +81,8 @@ export default function Dashboard() {
     <section className="hero-panel operations-hero">
       <div>
         <p className="eyebrow">Operations command center</p>
-        <h2>Know what needs attention—and who should handle it next.</h2>
-        <p>Prioritize new care requests, credential reviews, and active assignments from one focused workspace.</p>
+        <h2>Coordinate trusted care with clarity.</h2>
+        <p>See the work that needs attention, make confident decisions, and keep every request moving.</p>
       </div>
       <div className="hero-actions">
         <Link className="button coral" href="/jobs">Review care queue</Link>
@@ -89,38 +93,34 @@ export default function Dashboard() {
     <section className="dashboard-section">
       <div className="section-heading"><div><p className="eyebrow">Right now</p><h2>Operations pulse</h2></div><span className="live-pill"><i /> Live data</span></div>
 
-      {error ? (
-        <p className="notice">
-          {error} <Link href="/login">Go to login</Link>.
-        </p>
-      ) : null}
+      {error ? <div className="session-notice" role="alert"><span aria-hidden="true">!</span><div><strong>Sign in to view live operations</strong><p>Your secure admin session is missing or has expired.</p></div><Link className="button" href="/login">Sign in</Link></div> : null}
 
-      <div className="cards">
+      {!error ? <div className={`cards${loading ? " is-loading" : ""}`} aria-busy={loading}>
         <Link className="card priority-card" href="/jobs">
           <div className="label">Needs review</div>
-          <div className="value">{overview?.openRequests ?? 0}</div>
+          <div className="value">{loading ? "—" : overview?.openRequests ?? 0}</div>
           <p>Open care requests awaiting coordination</p>
           <span className="card-link">Open queue →</span>
         </Link>
         <Link className="card" href="/nurses">
           <div className="label">Credential decisions</div>
-          <div className="value">{overview?.pendingCredentials ?? 0}</div>
+          <div className="value">{loading ? "—" : overview?.pendingCredentials ?? 0}</div>
           <p>Professionals awaiting operator review</p>
           <span className="card-link">Review →</span>
         </Link>
         <Link className="card" href="/jobs">
           <div className="label">Care in progress</div>
-          <div className="value">{overview?.assignedRequests ?? 0}</div>
+          <div className="value">{loading ? "—" : overview?.assignedRequests ?? 0}</div>
           <p>Assigned requests being actively coordinated</p>
           <span className="card-link">Monitor →</span>
         </Link>
         <Link className="card" href="/nurses">
           <div className="label">Ready professionals</div>
-          <div className="value">{overview?.readyProfessionals ?? 0}</div>
+          <div className="value">{loading ? "—" : overview?.readyProfessionals ?? 0}</div>
           <p>Approved for closed-beta opportunities</p>
           <span className="card-link">View team →</span>
         </Link>
-      </div>
+      </div> : null}
     </section>
 
     <div className="dashboard-grid">
@@ -130,7 +130,7 @@ export default function Dashboard() {
           <Link href="/jobs">View all</Link>
         </div>
         <div className="work-list">
-          {priorityJobs.length === 0 ? <div className="empty-state"><strong>Queue is clear</strong><p>No open care requests need review.</p></div> : priorityJobs.map((job) => (
+          {loading ? <div className="empty-state"><strong>Loading care requests…</strong><p>Checking the dispatch queue.</p></div> : error ? <div className="empty-state"><strong>Queue unavailable</strong><p>Sign in to review care requests.</p></div> : priorityJobs.length === 0 ? <div className="empty-state"><strong>Queue is clear</strong><p>No open care requests need review.</p></div> : priorityJobs.map((job) => (
             <Link className="work-row" href={`/jobs/${job.id}`} key={job.id}>
               <span className="work-icon request-icon">↗</span>
               <span className="work-copy"><strong>{job.title}</strong><small>{job.applicant_count} applicant{job.applicant_count === 1 ? "" : "s"} · {relativeAge(job.created_at)}</small></span>
@@ -147,7 +147,7 @@ export default function Dashboard() {
           <Link href="/nurses">View all</Link>
         </div>
         <div className="work-list">
-          {pendingNurses.length === 0 ? <div className="empty-state"><strong>Reviews are current</strong><p>No pending credential decisions.</p></div> : pendingNurses.map((nurse) => (
+          {loading ? <div className="empty-state"><strong>Loading credential reviews…</strong><p>Checking the verification queue.</p></div> : error ? <div className="empty-state"><strong>Reviews unavailable</strong><p>Sign in to review credentials.</p></div> : pendingNurses.length === 0 ? <div className="empty-state"><strong>Reviews are current</strong><p>No pending credential decisions.</p></div> : pendingNurses.map((nurse) => (
             <Link className="work-row" href="/nurses" key={nurse.id}>
               <span className="work-icon person-icon">✓</span>
               <span className="work-copy"><strong>{nurse.profile_name ?? "Unnamed professional"}</strong><small>Submitted {relativeAge(nurse.created_at)}</small></span>
@@ -160,11 +160,11 @@ export default function Dashboard() {
     </div>
 
     <section className="team-readiness">
-      <div><p className="eyebrow">Team readiness</p><h2>Built for one operator today, structured for a team tomorrow.</h2><p>This workspace separates dispatch, credentialing, and people operations. The next release adds enforced case claiming and handoffs so two operators cannot work the same item unnoticed.</p></div>
+      <div><p className="eyebrow">How operations flow</p><h2>One workspace from intake to completed care.</h2><p>Dispatch, credentialing, and people operations stay connected so the team can act quickly without losing the audit trail.</p></div>
       <div className="readiness-points">
-        <span><i>1</i><strong>One queue</strong><small>Shared operational truth</small></span>
-        <span><i>2</i><strong>Clear ownership</strong><small>Next implementation</small></span>
-        <span><i>3</i><strong>Auditable actions</strong><small>Already recorded</small></span>
+        <span><i>1</i><strong>Review</strong><small>Prioritize the right work</small></span>
+        <span><i>2</i><strong>Coordinate</strong><small>Assign trusted professionals</small></span>
+        <span><i>3</i><strong>Resolve</strong><small>Close the loop with confidence</small></span>
       </div>
     </section>
     </>
