@@ -4,6 +4,8 @@ Date: 2026-08-12
 
 Status: proposed; owner, legal, clinical, insurance, and operating-model approval required before implementation
 
+Pre-approval supplement: [RN Appointment Companion Scenario Deep Dive](./rn-appointment-companion-scenario-deep-dive.md). The supplement pressure-tests 108 normal, edge, failure, abuse, and recovery scenarios and expands the owner decision set. Read and approve both documents together; approval of this document alone is not a launch authorization.
+
 ## Purpose
 
 This document reconciles the external Product Decision Memo with the current NurseBridge repository, the proven patient-to-nurse workflow, and Georgia-first regulatory research. It is a decision packet, not permission to launch, change the production schema, collect additional health information, take payment, or represent NurseBridge as a licensed clinical provider.
@@ -230,6 +232,7 @@ Before any paid or externally promoted clinical service, obtain written review o
 Authoritative starting references:
 
 - [Georgia Private Home Care Provider rules](https://rules.sos.ga.gov/gac/111-8-65)
+- [Georgia DCH July 2026 PHCP final-adoption document](https://dch.georgia.gov/document/document/private-home-care-providers-111-8-65-rules-final-adoption/download)
 - [Georgia Board of Nursing practice standards](https://rules.sos.ga.gov/gac/410-10)
 - [HHS guidance on sharing with people involved in care](https://www.hhs.gov/hipaa/for-professionals/faq/2087/does-hipaa-allow-a-health-care-provider-to-communicate-with-a-patients-family-friends-or-other-persons-who-are-involved-in-the-patient-care.html)
 - [AHRQ discharge and teach-back guidance](https://www.ahrq.gov/patient-safety/settings/hospital/red/toolkit/redtool3.html)
@@ -799,7 +802,7 @@ Safe engineering allowed in parallel:
 
 ## Decisions Required From the Owner
 
-The following are recommended defaults. The owner should approve or revise each before application/schema work expands.
+The following are recommended service-level defaults. The owner should approve or revise each before application/schema work expands. The scenario deep dive adds party/authority, accessibility, workforce, pricing, incident, privacy, beta-size, and expansion decisions; its 25-item list is the complete pre-build approval checklist.
 
 1. **Initial customer:** adult family caregivers coordinating planned outpatient care for older or medically vulnerable adults.
 2. **Launch geography:** Atlanta metro, Georgia only.
@@ -818,7 +821,8 @@ The following are recommended defaults. The owner should approve or revise each 
 
 Before this document becomes an accepted product blueprint:
 
-- owner decisions 1–12 are recorded;
+- owner decisions 1–12 and the scenario deep dive's complete 25-item approval list are recorded;
+- all 108 tabletop scenarios have an approved control, named external gate, or explicit deferred status;
 - contradictions with ADR 0001 and the existing product blueprint are resolved through a new ADR;
 - legal/clinical/insurance questions have named owners and target dates;
 - the initial service inclusion/exclusion policy is approved;
