@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import {
@@ -83,6 +84,7 @@ type PatientTab = "home" | "new" | "records" | "updates" | "account";
 type NurseTab = NurseWorkspaceTab;
 type EntryScreen = "welcome" | "start" | "signin" | "access" | "submitted";
 type RequestStep = 1 | 2 | 3;
+type RequestPickerMode = "date" | "time";
 
 let colors: ThemeColors = lightColors;
 let styles = createStyles(colors);
@@ -134,6 +136,31 @@ function statusLabel(status: string | null | undefined) {
 
 function workflowSummary(job: JobRow) {
   return careRequestProgressSummary(job.status);
+}
+
+function defaultAppointmentDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  date.setHours(9, 0, 0, 0);
+  return date;
+}
+
+function selectedAppointmentDate(value: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function appointmentDateLabel(value: string) {
+  const date = selectedAppointmentDate(value);
+  return date
+    ? date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+    : "Select date";
+}
+
+function appointmentTimeLabel(value: string) {
+  const date = selectedAppointmentDate(value);
+  return date ? date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : "Select time";
 }
 
 function StatusPill({ status }: { status: string }) {
@@ -834,6 +861,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
   const [accessForm, setAccessForm] = useState<PatientAccessForm>(emptyPatientAccessForm);
   const [patientTab, setPatientTab] = useState<PatientTab>("home");
   const [requestStep, setRequestStep] = useState<RequestStep>(1);
+  const [requestPickerMode, setRequestPickerMode] = useState<RequestPickerMode | null>(null);
   const [nurseTab, setNurseTab] = useState<NurseTab>("home");
 
   const [patientJobs, setPatientJobs] = useState<JobRow[]>([]);
@@ -1427,6 +1455,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
 
       setJobForm(emptyJobForm);
       setRequestStep(1);
+      setRequestPickerMode(null);
       setPatientTab("home");
       setNotice("Care request submitted.");
       await loadPatientJobs();
@@ -1435,6 +1464,21 @@ export default function App({ product = "patient" }: { product?: MobileProductId
     } finally {
       setActionLoading(false);
     }
+  }
+
+  function handleAppointmentPickerChange(event: DateTimePickerEvent, selectedValue?: Date) {
+    if (Platform.OS !== "ios" || event.type === "dismissed") {
+      setRequestPickerMode(null);
+    }
+    if (event.type === "dismissed" || !selectedValue || !requestPickerMode) return;
+
+    const next = selectedAppointmentDate(jobForm.start_time) ?? defaultAppointmentDate();
+    if (requestPickerMode === "date") {
+      next.setFullYear(selectedValue.getFullYear(), selectedValue.getMonth(), selectedValue.getDate());
+    } else {
+      next.setHours(selectedValue.getHours(), selectedValue.getMinutes(), 0, 0);
+    }
+    setJobForm((previous) => ({ ...previous, start_time: next.toISOString() }));
   }
 
   async function handleApply(job: JobRow) {
@@ -2145,25 +2189,68 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                           onChangeText={(text) => setJobForm((prev) => ({ ...prev, address: text }))}
                         />
                         <Text style={styles.inputLabel}>Requested date and time</Text>
-                        <TextInput
-                          accessibilityLabel="Requested date and time"
-                          style={styles.input}
-                          placeholder="Example: 2026-08-05 10:00 AM"
-                          placeholderTextColor={colors.mutedSoft}
-                          autoCapitalize="none"
-                          value={jobForm.start_time}
-                          onChangeText={(text) => setJobForm((prev) => ({ ...prev, start_time: text }))}
-                        />
-                        <Text style={styles.inputLabel}>Hourly rate (optional)</Text>
-                        <TextInput
-                          accessibilityLabel="Optional hourly rate"
-                          style={styles.input}
-                          placeholder="Leave blank if not used"
-                          placeholderTextColor={colors.mutedSoft}
-                          keyboardType="numeric"
-                          value={jobForm.hourly_rate}
-                          onChangeText={(text) => setJobForm((prev) => ({ ...prev, hourly_rate: text }))}
-                        />
+                        <View style={styles.dateTimeRow}>
+                          <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel={`Appointment date, ${appointmentDateLabel(jobForm.start_time)}`}
+                            style={styles.dateTimeButton}
+                            onPress={() => setRequestPickerMode("date")}
+                          >
+                            <Ionicons name="calendar-outline" size={18} color={colors.accent} />
+                            <View style={styles.dateTimeButtonCopy}>
+                              <Text style={styles.dateTimeButtonLabel}>Date</Text>
+                              <Text style={styles.dateTimeButtonValue}>{appointmentDateLabel(jobForm.start_time)}</Text>
+                            </View>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel={`Appointment time, ${appointmentTimeLabel(jobForm.start_time)}`}
+                            style={styles.dateTimeButton}
+                            onPress={() => setRequestPickerMode("time")}
+                          >
+                            <Ionicons name="time-outline" size={18} color={colors.accent} />
+                            <View style={styles.dateTimeButtonCopy}>
+                              <Text style={styles.dateTimeButtonLabel}>Time</Text>
+                              <Text style={styles.dateTimeButtonValue}>{appointmentTimeLabel(jobForm.start_time)}</Text>
+                            </View>
+                          </TouchableOpacity>
+                        </View>
+                        {requestPickerMode ? (
+                          <View style={styles.dateTimePickerPanel}>
+                            <DateTimePicker
+                              value={selectedAppointmentDate(jobForm.start_time) ?? defaultAppointmentDate()}
+                              mode={requestPickerMode}
+                              display={Platform.OS === "ios" ? "spinner" : "default"}
+                              minimumDate={requestPickerMode === "date" ? new Date() : undefined}
+                              maximumDate={requestPickerMode === "date" ? new Date(new Date().setFullYear(new Date().getFullYear() + 2)) : undefined}
+                              minuteInterval={5}
+                              onChange={handleAppointmentPickerChange}
+                            />
+                            {Platform.OS === "ios" ? (
+                              <TouchableOpacity
+                                accessibilityRole="button"
+                                style={styles.dateTimeDoneButton}
+                                onPress={() => setRequestPickerMode(null)}
+                              >
+                                <Text style={styles.dateTimeDoneButtonText}>Done</Text>
+                              </TouchableOpacity>
+                            ) : null}
+                          </View>
+                        ) : null}
+                        {jobForm.start_time ? (
+                          <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel="Clear requested date and time"
+                            style={styles.clearDateTimeButton}
+                            onPress={() => {
+                              setRequestPickerMode(null);
+                              setJobForm((previous) => ({ ...previous, start_time: "" }));
+                            }}
+                          >
+                            <Text style={styles.clearDateTimeButtonText}>Clear date and time</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                        <Text style={styles.formPrivacyNote}>Times are shown in your device’s local time zone. The care team will confirm availability and pricing.</Text>
                       </View>
                     ) : null}
 
@@ -2750,6 +2837,28 @@ return StyleSheet.create({
   requestProgressLabelActive: { color: colors.accent, fontWeight: "900" },
   requestStepTitle: { color: colors.ink, fontSize: 19, fontWeight: "900", letterSpacing: -0.4, marginBottom: 18 },
   formPrivacyNote: { color: colors.muted, fontSize: 11, lineHeight: 16, marginBottom: 4 },
+  dateTimeRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
+  dateTimeButton: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 15,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: "row",
+    gap: 9,
+    minHeight: 64,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  dateTimeButtonCopy: { flex: 1 },
+  dateTimeButtonLabel: { color: colors.muted, fontSize: 10, fontWeight: "800", marginBottom: 3, textTransform: "uppercase" },
+  dateTimeButtonValue: { color: colors.ink, fontSize: 12, fontWeight: "800", lineHeight: 16 },
+  dateTimePickerPanel: { backgroundColor: colors.surfaceMuted, borderRadius: 16, marginBottom: 10, overflow: "hidden", padding: 8 },
+  dateTimeDoneButton: { alignItems: "center", alignSelf: "flex-end", paddingHorizontal: 14, paddingVertical: 8 },
+  dateTimeDoneButtonText: { color: colors.accent, fontSize: 14, fontWeight: "900" },
+  clearDateTimeButton: { alignSelf: "flex-start", marginBottom: 8, paddingVertical: 4 },
+  clearDateTimeButtonText: { color: colors.danger, fontSize: 12, fontWeight: "800" },
   requestReview: { backgroundColor: colors.surfaceMuted, borderRadius: 17, marginBottom: 18, padding: 15 },
   requestReviewTitle: { color: colors.ink, fontSize: 15, fontWeight: "900", marginBottom: 8 },
   requestReviewMeta: { color: colors.muted, fontSize: 12, lineHeight: 18 },

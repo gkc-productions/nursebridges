@@ -23,8 +23,7 @@ export const emptyJobForm = {
   contact_context: "",
   mobility_notes: "",
   address: "",
-  start_time: "",
-  hourly_rate: ""
+  start_time: ""
 };
 
 export type CreateCareRequestForm = typeof emptyJobForm;
@@ -34,7 +33,6 @@ export type CreateCareRequestPayload = {
   description: string;
   address: string;
   start_time?: string;
-  hourly_rate?: number;
 };
 
 export type CreateCareRequestValidation =
@@ -419,16 +417,6 @@ export function parseStartTimeInput(value: string) {
   return date.toISOString();
 }
 
-export function parseHourlyRateInput(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-
-  const hourlyRate = Number(trimmed);
-  if (!Number.isFinite(hourlyRate) || hourlyRate < 0) return null;
-
-  return hourlyRate;
-}
-
 function buildCareRequestDescription(form: CreateCareRequestForm) {
   const sections = [
     form.description.trim(),
@@ -453,19 +441,13 @@ export function buildCreateCareRequestPayload(form: CreateCareRequestForm): Crea
     };
   }
 
-  const hourlyRate = parseHourlyRateInput(form.hourly_rate);
-  if (hourlyRate === null) {
-    return { ok: false, error: "Enter a valid hourly rate of 0 or more, or leave it blank." };
-  }
-
   return {
     ok: true,
     payload: {
       title,
       description: buildCareRequestDescription(form),
       address: form.address.trim().slice(0, 255),
-      start_time: startTime,
-      hourly_rate: hourlyRate
+      start_time: startTime
     }
   };
 }

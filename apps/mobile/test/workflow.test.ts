@@ -25,7 +25,6 @@ import {
   latestByCreatedAt,
   nurseEmptyStateCopy,
   nurseApplicationStateLabel,
-  parseHourlyRateInput,
   parseStartTimeInput,
   patientEmptyStateCopy,
   pickNurseFocusJob,
@@ -42,24 +41,14 @@ describe("mobile workflow helpers", () => {
     assert.equal(parseStartTimeInput("2026-05-01T14:00:00Z"), "2026-05-01T14:00:00.000Z");
   });
 
-  it("normalizes hourly rate input for create-job requests", () => {
-    assert.equal(parseHourlyRateInput(""), undefined);
-    assert.equal(parseHourlyRateInput("   "), undefined);
-    assert.equal(parseHourlyRateInput("45"), 45);
-    assert.equal(parseHourlyRateInput("45.50"), 45.5);
-    assert.equal(parseHourlyRateInput("-1"), null);
-    assert.equal(parseHourlyRateInput("forty five"), null);
-  });
-
-  it("builds patient-safe create request payloads without ownership fields", () => {
+  it("builds patient-safe create request payloads without ownership or patient-set pricing fields", () => {
     const result = buildCreateCareRequestPayload({
       title: " Morning appointment support ",
       description: " Help getting ready and into the car. ",
       contact_context: " Daughter is the point of contact. ",
       mobility_notes: " Uses a walker. ",
       address: " 123 Test Street ",
-      start_time: "2026-05-01T14:00:00Z",
-      hourly_rate: "45"
+      start_time: "2026-05-01T14:00:00Z"
     });
 
     assert.equal(result.ok, true);
@@ -70,14 +59,14 @@ describe("mobile workflow helpers", () => {
       description:
         "Help getting ready and into the car.\n\nContact context: Daughter is the point of contact.\n\nMobility/support notes: Uses a walker.",
       address: "123 Test Street",
-      start_time: "2026-05-01T14:00:00.000Z",
-      hourly_rate: 45
+      start_time: "2026-05-01T14:00:00.000Z"
     });
     assert.equal("patient_user_id" in result.payload, false);
     assert.equal("patient_id" in result.payload, false);
     assert.equal("created_by" in result.payload, false);
     assert.equal("contact_context" in result.payload, false);
     assert.equal("mobility_notes" in result.payload, false);
+    assert.equal("hourly_rate" in result.payload, false);
   });
 
   it("returns clear create request validation errors", () => {
@@ -88,8 +77,7 @@ describe("mobile workflow helpers", () => {
         contact_context: "",
         mobility_notes: "",
         address: "",
-        start_time: "",
-        hourly_rate: ""
+        start_time: ""
       }),
       { ok: false, error: "Enter the support type or request title. Use at least 3 characters." }
     );
@@ -100,22 +88,9 @@ describe("mobile workflow helpers", () => {
         contact_context: "",
         mobility_notes: "",
         address: "",
-        start_time: "not a date",
-        hourly_rate: ""
+        start_time: "not a date"
       }),
       { ok: false, error: "Use a date within the next two years, or leave it blank. Example: 2026-08-05 10:00 AM." }
-    );
-    assert.deepEqual(
-      buildCreateCareRequestPayload({
-        title: "Check in",
-        description: "",
-        contact_context: "",
-        mobility_notes: "",
-        address: "",
-        start_time: "",
-        hourly_rate: "-2"
-      }),
-      { ok: false, error: "Enter a valid hourly rate of 0 or more, or leave it blank." }
     );
   });
 
