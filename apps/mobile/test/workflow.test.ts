@@ -19,6 +19,7 @@ import {
   canCompleteJob,
   canCompleteJobStatus,
   canSelectApplication,
+  emptyJobForm,
   formatDate,
   formatRate,
   isJobStatus,
@@ -43,11 +44,17 @@ describe("mobile workflow helpers", () => {
 
   it("builds patient-safe create request payloads without ownership or patient-set pricing fields", () => {
     const result = buildCreateCareRequestPayload({
+      ...emptyJobForm,
       title: " Morning appointment support ",
       description: " Help getting ready and into the car. ",
-      contact_context: " Daughter is the point of contact. ",
       mobility_notes: " Uses a walker. ",
-      address: " 123 Test Street ",
+      street_address: " 123 Test Street ",
+      unit: "4B",
+      city: "Atlanta",
+      postal_code: "30303",
+      onsite_contact_name: "Daughter",
+      onsite_contact_relationship: "Family",
+      mobility_aids: ["walker"],
       start_time: "2026-05-01T14:00:00Z"
     });
 
@@ -56,10 +63,23 @@ describe("mobile workflow helpers", () => {
 
     assert.deepEqual(result.payload, {
       title: "Morning appointment support",
-      description:
-        "Help getting ready and into the car.\n\nContact context: Daughter is the point of contact.\n\nMobility/support notes: Uses a walker.",
-      address: "123 Test Street",
-      start_time: "2026-05-01T14:00:00.000Z"
+      description: "Help getting ready and into the car.",
+      start_time: "2026-05-01T14:00:00.000Z",
+      logistics: {
+        residence_type: "apartment",
+        street_address: "123 Test Street",
+        unit: "4B",
+        city: "Atlanta",
+        state: "GA",
+        postal_code: "30303",
+        stairs: "none",
+        mobility_aids: ["walker"],
+        mobility_notes: "Uses a walker.",
+        onsite_contact_name: "Daughter",
+        onsite_contact_relationship: "Family",
+        transportation_mode: "not_arranged",
+        return_plan: "not_arranged"
+      }
     });
     assert.equal("patient_user_id" in result.payload, false);
     assert.equal("patient_id" in result.payload, false);
@@ -72,22 +92,15 @@ describe("mobile workflow helpers", () => {
   it("returns clear create request validation errors", () => {
     assert.deepEqual(
       buildCreateCareRequestPayload({
+        ...emptyJobForm,
         title: "  ",
-        description: "",
-        contact_context: "",
-        mobility_notes: "",
-        address: "",
-        start_time: ""
       }),
       { ok: false, error: "Enter the support type or request title. Use at least 3 characters." }
     );
     assert.deepEqual(
       buildCreateCareRequestPayload({
+        ...emptyJobForm,
         title: "Check in",
-        description: "",
-        contact_context: "",
-        mobility_notes: "",
-        address: "",
         start_time: "not a date"
       }),
       { ok: false, error: "Use a date within the next two years, or leave it blank. Example: 2026-08-05 10:00 AM." }
@@ -328,7 +341,7 @@ describe("mobile workflow helpers", () => {
     assert.equal(detail.assignedToYou, false);
     assert.notEqual(detail.start, "-");
     assert.equal(detail.rate, "$40/hr");
-    assert.equal(detail.location, "456 Care Ave");
+    assert.equal(detail.location, "Service area not provided");
     assert.equal(detail.description, "Help getting to an appointment.");
   });
 
@@ -353,7 +366,7 @@ describe("mobile workflow helpers", () => {
     assert.equal(assignedToCurrentNurse.canApply, false);
     assert.equal(assignedToCurrentNurse.canComplete, true);
     assert.equal(assignedToCurrentNurse.assignedToYou, true);
-    assert.equal(assignedToCurrentNurse.location, "Location not provided");
+    assert.equal(assignedToCurrentNurse.location, "Service area not provided");
     assert.equal(assignedToCurrentNurse.description, "No description provided.");
 
     const assignedToAnotherNurse = buildNurseRequestDetailModel({

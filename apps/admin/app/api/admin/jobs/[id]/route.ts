@@ -26,12 +26,22 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 
   const { data: job, error } = await supabaseAdmin
     .from("jobs")
-    .select("id,status,patient_user_id,title,description,address,start_time,hourly_rate,created_at,updated_at")
+    .select("id,status,patient_user_id,title,description,address,service_city,service_state,start_time,hourly_rate,created_at,updated_at")
     .eq("id", id)
     .single();
 
   if (error || !job) {
     return adminJson(request, { error: "not_found" }, { status: 404 });
+  }
+
+  const { data: logistics, error: logisticsError } = await supabaseAdmin
+    .from("job_logistics")
+    .select("residence_type,street_address,unit,building_name,city,state,postal_code,stairs,elevator_available,meeting_point,parking_notes,arrival_instructions,mobility_aids,mobility_notes,onsite_contact_name,onsite_contact_relationship,onsite_contact_phone,transportation_mode,transportation_provider,pickup_time,return_plan,transportation_notes")
+    .eq("job_id", job.id)
+    .maybeSingle();
+
+  if (logisticsError) {
+    return adminJson(request, { error: "Unable to load private job logistics" }, { status: 400 });
   }
 
   const { data: applications, error: applicationError } = await supabaseAdmin
@@ -103,13 +113,16 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       title: job.title,
       description: job.description ?? null,
       address: job.address ?? null,
+      service_city: job.service_city ?? null,
+      service_state: job.service_state ?? null,
       start_time: job.start_time ?? null,
       hourly_rate: job.hourly_rate ?? null,
       created_at: job.created_at,
       updated_at: job.updated_at ?? null,
       patient_name: patientName,
       nurse_user_id: nurseId,
-      nurse_name: nurseName
+      nurse_name: nurseName,
+      logistics: logistics ?? null
     },
     applications: (applications ?? []).map((application) => {
       const row = application as ApplicationRow;

@@ -3,6 +3,7 @@ import { writeAdminAuditLog } from "../audit.js";
 import { requireAuth, requireRole } from "../auth.js";
 import { createNotification, createNotifications } from "../notifications.js";
 import { supabaseAdmin, supabaseForUser } from "../supabase.js";
+import { canReceivePrivateLogistics, privateAddressForViewer } from "../jobPrivacy.js";
 import { buildAssignedNurseMap } from "../jobAssignmentView.js";
 import { registerJobCreateRoute } from "./jobCreateRoute.js";
 import { registerJobApplyRoute } from "./jobApplyRoute.js";
@@ -20,8 +21,54 @@ type JobRow = {
   address: string | null;
   start_time: string | null;
   hourly_rate: number | null;
+  service_city: string | null;
+  service_state: string | null;
   created_at: string;
 };
+
+type JobLogisticsRow = {
+  job_id: string;
+  [key: string]: unknown;
+};
+
+const jobSelect = "id,status,patient_user_id,title,description,address,service_city,service_state,start_time,hourly_rate,created_at";
+const logisticsSelect = [
+  "job_id",
+  "residence_type",
+  "street_address",
+  "unit",
+  "building_name",
+  "city",
+  "state",
+  "postal_code",
+  "stairs",
+  "elevator_available",
+  "meeting_point",
+  "parking_notes",
+  "arrival_instructions",
+  "mobility_aids",
+  "mobility_notes",
+  "onsite_contact_name",
+  "onsite_contact_relationship",
+  "onsite_contact_phone",
+  "transportation_mode",
+  "transportation_provider",
+  "pickup_time",
+  "return_plan",
+  "transportation_notes"
+].join(",");
+
+async function fetchPrivateLogistics(jobs: JobRow[], assigned: Map<string, string>, role: string, userId: string, jwt: string) {
+  const visibleIds = jobs
+    .filter((job) => canReceivePrivateLogistics(role, userId, job, assigned.get(job.id) ?? null))
+    .map((job) => job.id);
+  if (visibleIds.length === 0) return new Map<string, JobLogisticsRow>();
+
+  const sb = supabaseForUser(jwt);
+  const { data, error } = await sb.from("job_logistics").select(logisticsSelect).in("job_id", visibleIds);
+  if (error) throw Object.assign(new Error("Unable to load private job logistics"), { statusCode: 500 });
+  return new Map(((data ?? []) as unknown as JobLogisticsRow[]).map((row) => [row.job_id, row]));
+}
 
 type ApplicationRow = {
   id?: string;
@@ -114,7 +161,7 @@ export async function jobRoutes(app: FastifyInstance) {
 
     let query = sb
       .from("jobs")
-      .select("id,status,patient_user_id,title,description,address,start_time,hourly_rate,created_at");
+      .select(jobSelect);
 
     if (authed.role === "patient") {
       query = query.eq("patient_user_id", authed.userId);
@@ -130,13 +177,16 @@ export async function jobRoutes(app: FastifyInstance) {
 
     const jobs = (data ?? []) as JobRow[];
     const { assigned, names } = await fetchAssignedNurseMap(jobs, authed.jwt);
+    const logistics = await fetchPrivateLogistics(jobs, assigned, authed.role, authed.userId, authed.jwt);
 
     const merged = jobs.map((job) => {
       const nurseId = assigned.get(job.id) ?? null;
       return {
         ...job,
+        address: privateAddressForViewer(job.address, authed.role, authed.userId, job, nurseId),
         assigned_nurse_user_id: nurseId,
-        assigned_nurse_name: nurseId ? names.get(nurseId) ?? null : null
+        assigned_nurse_name: nurseId ? names.get(nurseId) ?? null : null,
+        logistics: logistics.get(job.id) ?? null
       };
     });
 
@@ -151,7 +201,7 @@ export async function jobRoutes(app: FastifyInstance) {
 
     const { data: job, error } = await sb
       .from("jobs")
-      .select("id,status,patient_user_id,title,description,address,start_time,hourly_rate,created_at")
+      .select(jobSelect)
       .eq("id", jobId)
       .single();
 
@@ -159,12 +209,15 @@ export async function jobRoutes(app: FastifyInstance) {
 
     const { assigned, names } = await fetchAssignedNurseMap([job as JobRow], authed.jwt);
     const nurseId = assigned.get(jobId) ?? null;
+    const logistics = await fetchPrivateLogistics([job as JobRow], assigned, authed.role, authed.userId, authed.jwt);
 
     return reply.send({
       job: {
         ...(job as JobRow),
+        address: privateAddressForViewer((job as JobRow).address, authed.role, authed.userId, job as JobRow, nurseId),
         assigned_nurse_user_id: nurseId,
-        assigned_nurse_name: nurseId ? names.get(nurseId) ?? null : null
+        assigned_nurse_name: nurseId ? names.get(nurseId) ?? null : null,
+        logistics: logistics.get(jobId) ?? null
       }
     });
   });

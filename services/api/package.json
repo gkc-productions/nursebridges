@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "lint": "echo \"(add eslint later)\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test test/validators.test.ts test/jobWorkflow.test.ts test/jobPayload.test.ts test/jobAssignment.test.ts test/jobAssignmentView.test.ts test/jobTerminalCommand.test.ts test/adminAssignmentRoute.test.ts test/applicationDecisionRoute.test.ts test/jobApplyRoute.test.ts test/jobWithdrawRoute.test.ts test/jobCreateRoute.test.ts test/jobStatusCore.test.ts test/jobTerminalRoute.test.ts test/jobUpdateRoute.test.ts test/patientAccessRequestRoute.test.ts"
+    "test": "node --import tsx --test test/validators.test.ts test/jobWorkflow.test.ts test/jobPayload.test.ts test/jobPrivacy.test.ts test/jobAssignment.test.ts test/jobAssignmentView.test.ts test/jobTerminalCommand.test.ts test/adminAssignmentRoute.test.ts test/applicationDecisionRoute.test.ts test/jobApplyRoute.test.ts test/jobWithdrawRoute.test.ts test/jobCreateRoute.test.ts test/jobStatusCore.test.ts test/jobTerminalRoute.test.ts test/jobUpdateRoute.test.ts test/patientAccessRequestRoute.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^8.4.0",

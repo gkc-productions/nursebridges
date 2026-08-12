@@ -10,6 +10,8 @@ type JobRow = {
   title: string;
   description: string | null;
   address: string | null;
+  service_city: string | null;
+  service_state: string | null;
   start_time: string | null;
   hourly_rate: number | null;
   created_at: string;
@@ -75,7 +77,7 @@ export default function JobsPage() {
     const matchesFilter = filter === "all"
       || (filter === "active" && (job.status === "open" || job.status === "assigned"))
       || job.status === filter;
-    const haystack = `${job.title} ${job.patient_name ?? ""} ${job.nurse_name ?? ""} ${job.address ?? ""}`.toLowerCase();
+    const haystack = `${job.title} ${job.patient_name ?? ""} ${job.nurse_name ?? ""} ${job.service_city ?? ""} ${job.service_state ?? ""}`.toLowerCase();
     return matchesFilter && haystack.includes(query.trim().toLowerCase());
   });
 
@@ -118,7 +120,7 @@ export default function JobsPage() {
               </td>
               <td>
                 <strong>{job.title}</strong>
-                <div className="table-meta">{job.address ?? "No address"}</div>
+                <div className="table-meta">{[job.service_city, job.service_state].filter(Boolean).join(", ") || "No service area"}</div>
               </td>
               <td>{job.patient_name ?? "-"}</td>
               <td>{formatDateTime(job.start_time)}</td>

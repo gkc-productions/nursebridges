@@ -7,6 +7,8 @@ import type { Authed, UserRole } from "../src/auth.ts";
 
 type Operation = {
   table: string;
+  rpc?: string;
+  args?: Record<string, unknown>;
   insert?: Record<string, unknown>;
   select?: string;
 };
@@ -29,6 +31,11 @@ function createClient(results: Result[]) {
   return {
     operations,
     client: {
+      rpc(name: string, args: Record<string, unknown>) {
+        const operation: Operation = { table: "rpc", rpc: name, args };
+        operations.push(operation);
+        return results.shift() ?? { data: null, error: null };
+      },
       from(table: string) {
         const operation: Operation = { table };
         operations.push(operation);
@@ -128,7 +135,7 @@ describe("job create route", () => {
     const { app, user } = await buildApp({
       userResults: [
         {
-          data: { id: "job-1", title: "Dialysis appointment support", status: "open" },
+          data: "job-1",
           error: null
         }
       ]
@@ -142,25 +149,59 @@ describe("job create route", () => {
         description: "",
         address: "120 Main Street",
         start_time: "2026-05-01T14:00:00Z",
-        hourly_rate: "45"
+        hourly_rate: "45",
+        logistics: {
+          residence_type: "apartment",
+          street_address: "120 Main Street",
+          unit: "4B",
+          city: "Atlanta",
+          state: "GA",
+          postal_code: "30303",
+          stairs: "entrance",
+          elevator_available: true,
+          mobility_aids: ["walker"],
+          transportation_mode: "medical_transport",
+          transportation_provider: "Scheduled provider",
+          return_plan: "round_trip"
+        }
       }
     });
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(user.operations[0], {
-      table: "jobs",
-      insert: {
-        created_by: "patient-1",
-        patient_user_id: "patient-1",
-        patient_id: "patient-1",
+      table: "rpc",
+      rpc: "create_care_request",
+      args: {
+        p_request: {
         title: "Dialysis appointment support",
         description: null,
-        address: "120 Main Street",
         start_time: "2026-05-01T14:00:00.000Z",
-        hourly_rate: 45,
-        status: "open"
-      },
-      select: "*"
+          logistics: {
+            residence_type: "apartment",
+            street_address: "120 Main Street",
+            unit: "4B",
+            building_name: null,
+            city: "Atlanta",
+            state: "GA",
+            postal_code: "30303",
+            stairs: "entrance",
+            elevator_available: true,
+            meeting_point: null,
+            parking_notes: null,
+            arrival_instructions: null,
+            mobility_aids: ["walker"],
+            mobility_notes: null,
+            onsite_contact_name: null,
+            onsite_contact_relationship: null,
+            onsite_contact_phone: null,
+            transportation_mode: "medical_transport",
+            transportation_provider: "Scheduled provider",
+            pickup_time: null,
+            return_plan: "round_trip",
+            transportation_notes: null
+          }
+        }
+      }
     });
     assert.deepEqual(response.json(), { job: { id: "job-1", title: "Dialysis appointment support", status: "open" } });
     await app.close();
@@ -185,7 +226,18 @@ describe("job create route", () => {
       method: "POST",
       url: "/jobs",
       headers: { "x-request-id": "create-job-test-request" },
-      payload: { title: "Post-op check-in" }
+      payload: {
+        title: "Post-op check-in",
+        logistics: {
+          residence_type: "house",
+          street_address: "10 Care Lane",
+          city: "Decatur",
+          state: "GA",
+          postal_code: "30030",
+          transportation_mode: "not_arranged",
+          return_plan: "not_arranged"
+        }
+      }
     });
 
     assert.equal(response.statusCode, 400);

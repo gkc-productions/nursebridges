@@ -10,12 +10,40 @@ type JobDetail = {
   title: string;
   description: string | null;
   address: string | null;
+  service_city: string | null;
+  service_state: string | null;
   start_time: string | null;
   hourly_rate: number | null;
   created_at: string;
   patient_name: string | null;
   nurse_user_id: string | null;
   nurse_name: string | null;
+  logistics: JobLogistics | null;
+};
+
+type JobLogistics = {
+  residence_type: string;
+  street_address: string;
+  unit: string | null;
+  building_name: string | null;
+  city: string;
+  state: string;
+  postal_code: string;
+  stairs: string;
+  elevator_available: boolean | null;
+  meeting_point: string | null;
+  parking_notes: string | null;
+  arrival_instructions: string | null;
+  mobility_aids: string[];
+  mobility_notes: string | null;
+  onsite_contact_name: string | null;
+  onsite_contact_relationship: string | null;
+  onsite_contact_phone: string | null;
+  transportation_mode: string;
+  transportation_provider: string | null;
+  pickup_time: string | null;
+  return_plan: string;
+  transportation_notes: string | null;
 };
 
 type EventRow = {
@@ -51,6 +79,14 @@ function formatEventType(value: string) {
     .replace(/^job_/, "")
     .replaceAll("_", " ")
     .replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function label(value: string | null | undefined) {
+  return value ? value.replaceAll("_", " ") : "-";
+}
+
+function joined(values: Array<string | null | undefined>) {
+  return values.filter(Boolean).join(" · ") || "-";
 }
 
 export default function JobDetailPage() {
@@ -140,11 +176,31 @@ export default function JobDetailPage() {
             <p>Status: {job.status}</p>
             <p>Patient: {job.patient_name ?? "-"}</p>
             <p>Nurse: {job.nurse_name ?? job.nurse_user_id ?? "Unassigned"}</p>
-            <p>Address: {job.address ?? "-"}</p>
+            <p>Service area: {[job.service_city, job.service_state].filter(Boolean).join(", ") || "-"}</p>
             <p>Start: {formatDateTime(job.start_time)}</p>
             <p>Rate: {formatRate(job.hourly_rate)}</p>
             <p>Created: {formatDateTime(job.created_at)}</p>
             <p>Description: {job.description ?? "-"}</p>
+            {job.logistics ? (
+              <>
+                <h3>Private residence and arrival</h3>
+                <p>Residence: {label(job.logistics.residence_type)}</p>
+                <p>Address: {joined([job.logistics.building_name, job.logistics.street_address, job.logistics.unit ? `Unit ${job.logistics.unit}` : null, job.logistics.city, job.logistics.state, job.logistics.postal_code])}</p>
+                <p>Stairs / elevator: {joined([label(job.logistics.stairs), job.logistics.elevator_available === null ? null : job.logistics.elevator_available ? "Elevator available" : "No elevator"])}</p>
+                <p>Meeting point: {job.logistics.meeting_point ?? "-"}</p>
+                <p>Parking: {job.logistics.parking_notes ?? "-"}</p>
+                <p>Arrival instructions: {job.logistics.arrival_instructions ?? "-"}</p>
+                <h3>Mobility and contact</h3>
+                <p>Mobility aids: {job.logistics.mobility_aids.length ? job.logistics.mobility_aids.map(label).join(", ") : "None reported"}</p>
+                <p>Mobility notes: {job.logistics.mobility_notes ?? "-"}</p>
+                <p>On-site contact: {joined([job.logistics.onsite_contact_name, job.logistics.onsite_contact_relationship, job.logistics.onsite_contact_phone])}</p>
+                <h3>Transportation</h3>
+                <p>Outbound plan: {joined([label(job.logistics.transportation_mode), job.logistics.transportation_provider])}</p>
+                <p>Pickup: {formatDateTime(job.logistics.pickup_time)}</p>
+                <p>Return plan: {label(job.logistics.return_plan)}</p>
+                <p>Notes: {job.logistics.transportation_notes ?? "-"}</p>
+              </>
+            ) : <p>Structured logistics have not been recorded for this legacy request.</p>}
             <div className="actions">
               <button
                 className="button"

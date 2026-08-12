@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
   const { data: jobs, error } = await supabaseAdmin
     .from("jobs")
-    .select("id,status,patient_user_id,title,description,address,start_time,hourly_rate,created_at")
+    .select("id,status,patient_user_id,title,description,address,service_city,service_state,start_time,hourly_rate,created_at")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -87,6 +87,8 @@ export async function GET(request: NextRequest) {
       title: job.title,
       description: job.description ?? null,
       address: job.address ?? null,
+      service_city: job.service_city ?? null,
+      service_state: job.service_state ?? null,
       start_time: job.start_time ?? null,
       hourly_rate: job.hourly_rate ?? null,
       created_at: job.created_at,

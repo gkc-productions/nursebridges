@@ -20,10 +20,29 @@ import {
 export const emptyJobForm = {
   title: "",
   description: "",
-  contact_context: "",
   mobility_notes: "",
-  address: "",
-  start_time: ""
+  start_time: "",
+  residence_type: "apartment" as "house" | "apartment" | "assisted_living" | "other",
+  street_address: "",
+  unit: "",
+  building_name: "",
+  city: "",
+  state: "GA",
+  postal_code: "",
+  stairs: "none" as "none" | "entrance" | "interior" | "both" | "unknown",
+  elevator_available: "unknown" as "yes" | "no" | "unknown",
+  meeting_point: "",
+  parking_notes: "",
+  arrival_instructions: "",
+  mobility_aids: [] as Array<"cane" | "walker" | "wheelchair" | "scooter" | "other">,
+  onsite_contact_name: "",
+  onsite_contact_relationship: "",
+  onsite_contact_phone: "",
+  transportation_mode: "not_arranged" as "patient_arranged" | "family_friend" | "rideshare" | "medical_transport" | "public_transit" | "other" | "not_arranged",
+  transportation_provider: "",
+  pickup_time: "",
+  return_plan: "not_arranged" as "round_trip" | "one_way" | "family_pickup" | "other" | "not_arranged",
+  transportation_notes: ""
 };
 
 export type CreateCareRequestForm = typeof emptyJobForm;
@@ -31,8 +50,31 @@ export type CreateCareRequestForm = typeof emptyJobForm;
 export type CreateCareRequestPayload = {
   title: string;
   description: string;
-  address: string;
   start_time?: string;
+  logistics: {
+    residence_type: CreateCareRequestForm["residence_type"];
+    street_address: string;
+    unit?: string;
+    building_name?: string;
+    city: string;
+    state: string;
+    postal_code: string;
+    stairs: CreateCareRequestForm["stairs"];
+    elevator_available?: boolean;
+    meeting_point?: string;
+    parking_notes?: string;
+    arrival_instructions?: string;
+    mobility_aids: CreateCareRequestForm["mobility_aids"];
+    mobility_notes?: string;
+    onsite_contact_name?: string;
+    onsite_contact_relationship?: string;
+    onsite_contact_phone?: string;
+    transportation_mode: CreateCareRequestForm["transportation_mode"];
+    transportation_provider?: string;
+    pickup_time?: string;
+    return_plan: CreateCareRequestForm["return_plan"];
+    transportation_notes?: string;
+  };
 };
 
 export type CreateCareRequestValidation =
@@ -111,6 +153,10 @@ export type PatientRequestDetailModel = {
   start: string;
   rate: string;
   location: string;
+  access: string;
+  mobility: string;
+  transportation: string;
+  onsiteContact: string;
   relatedUpdates: number;
   canCancel: boolean;
   canComplete: boolean;
@@ -131,6 +177,10 @@ export type NurseRequestDetailModel = {
   start: string;
   rate: string;
   location: string;
+  access: string;
+  mobility: string;
+  transportation: string;
+  onsiteContact: string;
   description: string;
 };
 
@@ -295,6 +345,9 @@ export function buildPatientRequestDetailModel(input: {
     hourly_rate?: number | null;
     assigned_nurse_name?: string | null;
     assigned_nurse_user_id?: string | null;
+    service_city?: string | null;
+    service_state?: string | null;
+    logistics?: LogisticsDetail | null;
   };
   notifications: Array<{ entity_id?: string | null }>;
   jobId: string;
@@ -311,7 +364,11 @@ export function buildPatientRequestDetailModel(input: {
     assignedCaregiver,
     start: formatDate(input.job.start_time ?? null),
     rate: formatRate(input.job.hourly_rate ?? null),
-    location: input.job.address?.trim() || "Location not provided",
+    location: formatResidence(input.job),
+    access: formatAccessDetails(input.job.logistics),
+    mobility: formatMobilityDetails(input.job.logistics),
+    transportation: formatTransportationDetails(input.job.logistics),
+    onsiteContact: formatOnsiteContact(input.job.logistics),
     relatedUpdates,
     canCancel: canCancelJob(input.job),
     canComplete: canCompleteJob(input.job, input.role, input.userId),
@@ -335,6 +392,9 @@ export function buildNurseRequestDetailModel(input: {
     start_time?: string | null;
     hourly_rate?: number | null;
     assigned_nurse_user_id?: string | null;
+    service_city?: string | null;
+    service_state?: string | null;
+    logistics?: LogisticsDetail | null;
   };
   isApprovedNurse: boolean;
   applicationStatus?: string | null;
@@ -357,7 +417,11 @@ export function buildNurseRequestDetailModel(input: {
     assignedToYou,
     start: formatDate(input.job.start_time ?? null),
     rate: formatRate(input.job.hourly_rate ?? null),
-    location: input.job.address?.trim() || "Location not provided",
+    location: input.job.logistics ? formatResidence(input.job) : formatServiceArea(input.job),
+    access: formatAccessDetails(input.job.logistics),
+    mobility: formatMobilityDetails(input.job.logistics),
+    transportation: formatTransportationDetails(input.job.logistics),
+    onsiteContact: formatOnsiteContact(input.job.logistics),
     description: input.job.description?.trim() || "No description provided."
   };
 }
@@ -394,6 +458,91 @@ export function formatRate(value: number | null) {
   return `$${value}/hr`;
 }
 
+type LogisticsDetail = {
+  residence_type?: string | null;
+  street_address?: string | null;
+  unit?: string | null;
+  building_name?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  stairs?: string | null;
+  elevator_available?: boolean | null;
+  meeting_point?: string | null;
+  parking_notes?: string | null;
+  arrival_instructions?: string | null;
+  mobility_aids?: string[] | null;
+  mobility_notes?: string | null;
+  onsite_contact_name?: string | null;
+  onsite_contact_relationship?: string | null;
+  onsite_contact_phone?: string | null;
+  transportation_mode?: string | null;
+  transportation_provider?: string | null;
+  pickup_time?: string | null;
+  return_plan?: string | null;
+  transportation_notes?: string | null;
+};
+
+function humanize(value: string | null | undefined) {
+  return value ? value.replace(/_/g, " ") : "";
+}
+
+export function formatServiceArea(job: { service_city?: string | null; service_state?: string | null }) {
+  return [job.service_city, job.service_state].filter(Boolean).join(", ") || "Service area not provided";
+}
+
+export function formatResidence(job: {
+  address?: string | null;
+  service_city?: string | null;
+  service_state?: string | null;
+  logistics?: LogisticsDetail | null;
+}) {
+  const logistics = job.logistics;
+  if (!logistics) {
+    const serviceArea = [job.service_city, job.service_state].filter(Boolean).join(", ");
+    return job.address?.trim() || serviceArea || "Location not provided";
+  }
+  const street = [logistics.street_address, logistics.unit ? `Unit ${logistics.unit}` : null].filter(Boolean).join(", ");
+  const locality = [logistics.city, logistics.state, logistics.postal_code].filter(Boolean).join(" ");
+  return [logistics.building_name, street, locality].filter(Boolean).join(" · ") || formatServiceArea(job);
+}
+
+export function formatAccessDetails(logistics?: LogisticsDetail | null) {
+  if (!logistics) return "Shared after assignment";
+  const stairs = logistics.stairs && logistics.stairs !== "none" ? `Stairs: ${humanize(logistics.stairs)}` : "No stairs reported";
+  const elevator = logistics.elevator_available === null || logistics.elevator_available === undefined
+    ? ""
+    : logistics.elevator_available ? "Elevator available" : "No elevator";
+  return [stairs, elevator, logistics.meeting_point, logistics.parking_notes, logistics.arrival_instructions]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+export function formatMobilityDetails(logistics?: LogisticsDetail | null) {
+  if (!logistics) return "Shared after assignment";
+  const aids = logistics.mobility_aids?.filter((aid) => aid !== "none").map(humanize).join(", ");
+  return [aids ? `Aids: ${aids}` : "No mobility aids reported", logistics.mobility_notes].filter(Boolean).join(" · ");
+}
+
+export function formatTransportationDetails(logistics?: LogisticsDetail | null) {
+  if (!logistics) return "Shared after assignment";
+  const pickup = logistics.pickup_time ? `Pickup ${formatDate(logistics.pickup_time)}` : "";
+  return [
+    humanize(logistics.transportation_mode) || "Not arranged",
+    logistics.transportation_provider,
+    pickup,
+    logistics.return_plan ? `Return: ${humanize(logistics.return_plan)}` : "",
+    logistics.transportation_notes
+  ].filter(Boolean).join(" · ");
+}
+
+export function formatOnsiteContact(logistics?: LogisticsDetail | null) {
+  if (!logistics) return "Shared after assignment";
+  return [logistics.onsite_contact_name, logistics.onsite_contact_relationship, logistics.onsite_contact_phone]
+    .filter(Boolean)
+    .join(" · ") || "No additional contact provided";
+}
+
 function safeFileName(name: string | null | undefined) {
   const fallback = "verification-document";
   const trimmed = (name ?? fallback).trim() || fallback;
@@ -418,13 +567,7 @@ export function parseStartTimeInput(value: string) {
 }
 
 function buildCareRequestDescription(form: CreateCareRequestForm) {
-  const sections = [
-    form.description.trim(),
-    form.contact_context.trim() ? `Contact context: ${form.contact_context.trim()}` : "",
-    form.mobility_notes.trim() ? `Mobility/support notes: ${form.mobility_notes.trim()}` : ""
-  ].filter(Boolean);
-
-  return sections.join("\n\n").slice(0, 4000);
+  return form.description.trim().slice(0, 4000);
 }
 
 export function buildCreateCareRequestPayload(form: CreateCareRequestForm): CreateCareRequestValidation {
@@ -441,13 +584,57 @@ export function buildCreateCareRequestPayload(form: CreateCareRequestForm): Crea
     };
   }
 
+  const requiredLogistics = [
+    [form.street_address, "Enter the residence street address."],
+    [form.city, "Enter the residence city."],
+    [form.state, "Enter the two-letter state code."],
+    [form.postal_code, "Enter the residence ZIP code."]
+  ] as const;
+  for (const [value, error] of requiredLogistics) {
+    if (!value.trim()) return { ok: false, error };
+  }
+  if (!/^[A-Za-z]{2}$/.test(form.state.trim())) return { ok: false, error: "Enter a two-letter state code." };
+  if (!/^\d{5}(?:-\d{4})?$/.test(form.postal_code.trim())) return { ok: false, error: "Enter a valid ZIP code." };
+  if (form.residence_type === "apartment" && !form.unit.trim()) {
+    return { ok: false, error: "Enter the apartment or unit number." };
+  }
+  if (/\b(?:door|gate|alarm|lockbox|keypad|entry)\s*(?:code|pin)\b|\bcode\s*(?:is|:)\s*[a-z0-9#*]{3,}\b/i.test(form.arrival_instructions)) {
+    return { ok: false, error: "Do not enter access codes. Share time-limited access details by phone after a nurse is assigned." };
+  }
+
+  const pickupTime = parseStartTimeInput(form.pickup_time);
+  if (pickupTime === null) return { ok: false, error: "Select a valid transportation pickup time or leave it blank." };
+
   return {
     ok: true,
     payload: {
       title,
       description: buildCareRequestDescription(form),
-      address: form.address.trim().slice(0, 255),
-      start_time: startTime
+      start_time: startTime,
+      logistics: {
+        residence_type: form.residence_type,
+        street_address: form.street_address.trim().slice(0, 200),
+        ...(form.unit.trim() ? { unit: form.unit.trim().slice(0, 50) } : {}),
+        ...(form.building_name.trim() ? { building_name: form.building_name.trim().slice(0, 120) } : {}),
+        city: form.city.trim().slice(0, 100),
+        state: form.state.trim().toUpperCase(),
+        postal_code: form.postal_code.trim(),
+        stairs: form.stairs,
+        ...(form.elevator_available !== "unknown" ? { elevator_available: form.elevator_available === "yes" } : {}),
+        ...(form.meeting_point.trim() ? { meeting_point: form.meeting_point.trim().slice(0, 300) } : {}),
+        ...(form.parking_notes.trim() ? { parking_notes: form.parking_notes.trim().slice(0, 500) } : {}),
+        ...(form.arrival_instructions.trim() ? { arrival_instructions: form.arrival_instructions.trim().slice(0, 500) } : {}),
+        mobility_aids: form.mobility_aids,
+        ...(form.mobility_notes.trim() ? { mobility_notes: form.mobility_notes.trim().slice(0, 1000) } : {}),
+        ...(form.onsite_contact_name.trim() ? { onsite_contact_name: form.onsite_contact_name.trim().slice(0, 120) } : {}),
+        ...(form.onsite_contact_relationship.trim() ? { onsite_contact_relationship: form.onsite_contact_relationship.trim().slice(0, 80) } : {}),
+        ...(form.onsite_contact_phone.trim() ? { onsite_contact_phone: form.onsite_contact_phone.trim().slice(0, 30) } : {}),
+        transportation_mode: form.transportation_mode,
+        ...(form.transportation_provider.trim() ? { transportation_provider: form.transportation_provider.trim().slice(0, 120) } : {}),
+        ...(pickupTime ? { pickup_time: pickupTime } : {}),
+        return_plan: form.return_plan,
+        ...(form.transportation_notes.trim() ? { transportation_notes: form.transportation_notes.trim().slice(0, 1000) } : {})
+      }
     }
   };
 }

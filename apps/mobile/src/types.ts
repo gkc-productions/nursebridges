@@ -1,5 +1,31 @@
 export type UserRole = "patient" | "nurse" | "admin";
 
+export type JobLogistics = {
+  job_id: string;
+  residence_type: "house" | "apartment" | "assisted_living" | "other";
+  street_address: string;
+  unit: string | null;
+  building_name: string | null;
+  city: string;
+  state: string;
+  postal_code: string;
+  stairs: "none" | "entrance" | "interior" | "both" | "unknown";
+  elevator_available: boolean | null;
+  meeting_point: string | null;
+  parking_notes: string | null;
+  arrival_instructions: string | null;
+  mobility_aids: string[];
+  mobility_notes: string | null;
+  onsite_contact_name: string | null;
+  onsite_contact_relationship: string | null;
+  onsite_contact_phone: string | null;
+  transportation_mode: string;
+  transportation_provider: string | null;
+  pickup_time: string | null;
+  return_plan: string;
+  transportation_notes: string | null;
+};
+
 export type JobRow = {
   id: string;
   title: string;
@@ -7,6 +33,9 @@ export type JobRow = {
   address: string | null;
   start_time: string | null;
   hourly_rate: number | null;
+  service_city?: string | null;
+  service_state?: string | null;
+  logistics?: JobLogistics | null;
   status: string;
   created_at: string;
   patient_user_id?: string | null;

@@ -10,7 +10,19 @@ describe("createJobSchema", () => {
       description: "",
       address: "  120 Main Street  ",
       start_time: "2026-05-01T14:00:00Z",
-      hourly_rate: "45"
+      hourly_rate: "45",
+      logistics: {
+        residence_type: "apartment",
+        street_address: "120 Main Street",
+        unit: "4B",
+        city: "Atlanta",
+        state: "ga",
+        postal_code: "30303",
+        stairs: "entrance",
+        elevator_available: true,
+        transportation_mode: "medical_transport",
+        return_plan: "round_trip"
+      }
     });
 
     assert.equal(parsed.title, "Post-op check-in");
@@ -18,11 +30,22 @@ describe("createJobSchema", () => {
     assert.equal(parsed.address, "120 Main Street");
     assert.equal(parsed.start_time, "2026-05-01T14:00:00.000Z");
     assert.equal(parsed.hourly_rate, 45);
+    assert.equal(parsed.logistics.state, "GA");
+    assert.deepEqual(parsed.logistics.mobility_aids, []);
   });
 
   it("allows omitted optional request details", () => {
     const parsed = createJobSchema.parse({
-      title: "Dialysis appointment support"
+      title: "Dialysis appointment support",
+      logistics: {
+        residence_type: "house",
+        street_address: "10 Care Lane",
+        city: "Decatur",
+        state: "GA",
+        postal_code: "30030",
+        transportation_mode: "not_arranged",
+        return_plan: "not_arranged"
+      }
     });
 
     assert.equal(parsed.description, "");
@@ -36,7 +59,16 @@ describe("createJobSchema", () => {
       () =>
         createJobSchema.parse({
           title: "Medication pickup",
-          start_time: "next Tuesday"
+          start_time: "next Tuesday",
+          logistics: {
+            residence_type: "house",
+            street_address: "10 Care Lane",
+            city: "Decatur",
+            state: "GA",
+            postal_code: "30030",
+            transportation_mode: "not_arranged",
+            return_plan: "not_arranged"
+          }
         }),
       (error) =>
         error instanceof ZodError &&
@@ -49,11 +81,47 @@ describe("createJobSchema", () => {
       () =>
         createJobSchema.parse({
           title: "Home safety visit",
-          hourly_rate: "-1"
+          hourly_rate: "-1",
+          logistics: {
+            residence_type: "house",
+            street_address: "10 Care Lane",
+            city: "Decatur",
+            state: "GA",
+            postal_code: "30030",
+            transportation_mode: "not_arranged",
+            return_plan: "not_arranged"
+          }
         }),
       (error) =>
         error instanceof ZodError &&
         error.issues.some((issue) => issue.path.join(".") === "hourly_rate")
+    );
+  });
+
+  it("requires apartment routing details and blocks access codes", () => {
+    const base = {
+      title: "Appointment support",
+      logistics: {
+        residence_type: "apartment",
+        street_address: "120 Main Street",
+        city: "Atlanta",
+        state: "GA",
+        postal_code: "30303",
+        transportation_mode: "family_friend",
+        return_plan: "round_trip"
+      }
+    };
+
+    assert.throws(
+      () => createJobSchema.parse(base),
+      (error) => error instanceof ZodError && error.issues.some((issue) => issue.path.join(".") === "logistics.unit")
+    );
+    assert.throws(
+      () => createJobSchema.parse({
+        ...base,
+        logistics: { ...base.logistics, unit: "4B", arrival_instructions: "Gate code is 1234" }
+      }),
+      (error) => error instanceof ZodError && error.issues.some((issue) => issue.path.join(".") === "logistics.arrival_instructions")
     );
   });
 });

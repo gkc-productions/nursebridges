@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Authed, UserRole } from "../auth.js";
-import { buildCreateJobPayload } from "../jobPayload.js";
+import { buildCreateCareRequestRpcPayload } from "../jobPayload.js";
 import { createJobSchema } from "../validators.js";
 
 type JobCreateRouteDeps = {
@@ -17,9 +17,8 @@ export async function registerJobCreateRoute(app: FastifyInstance, deps: JobCrea
     const body = createJobSchema.parse(req.body ?? {});
     const sb = deps.supabaseForUser(authed.jwt);
 
-    const payload = buildCreateJobPayload(authed.userId, body);
-
-    const { data, error } = await sb.from("jobs").insert(payload).select("*").single();
+    const payload = buildCreateCareRequestRpcPayload(body);
+    const { data: jobId, error } = await sb.rpc("create_care_request", { p_request: payload });
     if (error) {
       req.log.warn({
         event: "create_job_failed",
@@ -36,6 +35,6 @@ export async function registerJobCreateRoute(app: FastifyInstance, deps: JobCrea
       return reply.code(400).send({ error: "Unable to create job", requestId: req.id });
     }
 
-    return reply.send({ job: data });
+    return reply.send({ job: { id: jobId, title: body.title, status: "open" } });
   });
 }

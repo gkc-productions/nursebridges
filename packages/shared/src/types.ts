@@ -31,6 +31,8 @@ export type Job = {
   address: string | null;
   start_time: string | null;
   hourly_rate: number | null;
+  service_city?: string | null;
+  service_state?: string | null;
   status: JobStatus;
   assigned_nurse_user_id?: string | null;
   created_at: string;

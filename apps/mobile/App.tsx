@@ -70,6 +70,7 @@ import {
   canCancelJob,
   canCompleteJob,
   emptyJobForm,
+  formatServiceArea,
   formatDate,
   formatRate,
   latestByCreatedAt,
@@ -83,8 +84,8 @@ import {
 type PatientTab = "home" | "new" | "records" | "updates" | "account";
 type NurseTab = NurseWorkspaceTab;
 type EntryScreen = "welcome" | "start" | "signin" | "access" | "submitted";
-type RequestStep = 1 | 2 | 3;
-type RequestPickerMode = "date" | "time";
+type RequestStep = 1 | 2 | 3 | 4 | 5;
+type RequestPickerState = { field: "start_time" | "pickup_time"; mode: "date" | "time" };
 
 let colors: ThemeColors = lightColors;
 let styles = createStyles(colors);
@@ -333,7 +334,11 @@ function PatientRequestDetailPanel({
       fields={[
         { label: "Assigned caregiver", value: detail.assignedCaregiver },
         { label: "Start", value: detail.start },
-        { label: "Location", value: detail.location },
+        { label: "Residence", value: detail.location },
+        { label: "Arrival and access", value: detail.access },
+        { label: "Mobility", value: detail.mobility },
+        { label: "Transportation", value: detail.transportation },
+        { label: "On-site contact", value: detail.onsiteContact },
         { label: "Rate", value: detail.rate },
         { label: "Related updates", value: detail.relatedUpdates }
       ]}
@@ -817,9 +822,9 @@ function SectionHeader({
 }
 
 function RequestProgress({ step }: { step: RequestStep }) {
-  const labels = ["Need", "Schedule", "Review"];
+  const labels = ["Need", "Schedule", "Home", "Ride", "Review"];
   return (
-    <View style={styles.requestProgress} accessibilityLabel={`Care request step ${step} of 3`}>
+    <View style={styles.requestProgress} accessibilityLabel={`Care request step ${step} of 5`}>
       {labels.map((label, index) => {
         const position = (index + 1) as RequestStep;
         const isComplete = position < step;
@@ -833,6 +838,35 @@ function RequestProgress({ step }: { step: RequestStep }) {
             </View>
             <Text style={[styles.requestProgressLabel, isCurrent ? styles.requestProgressLabelActive : null]}>{label}</Text>
           </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function ChoiceGroup<T extends string>({
+  value,
+  options,
+  onChange
+}: {
+  value: T;
+  options: Array<{ value: T; label: string }>;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <View style={styles.choiceWrap}>
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            key={option.value}
+            style={[styles.choiceButton, styles.compactChoiceButton, active ? styles.choiceButtonActive : null]}
+            onPress={() => onChange(option.value)}
+          >
+            <Text style={[styles.choiceButtonText, active ? styles.choiceButtonTextActive : null]}>{option.label}</Text>
+          </TouchableOpacity>
         );
       })}
     </View>
@@ -861,7 +895,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
   const [accessForm, setAccessForm] = useState<PatientAccessForm>(emptyPatientAccessForm);
   const [patientTab, setPatientTab] = useState<PatientTab>("home");
   const [requestStep, setRequestStep] = useState<RequestStep>(1);
-  const [requestPickerMode, setRequestPickerMode] = useState<RequestPickerMode | null>(null);
+  const [requestPicker, setRequestPicker] = useState<RequestPickerState | null>(null);
   const [nurseTab, setNurseTab] = useState<NurseTab>("home");
 
   const [patientJobs, setPatientJobs] = useState<JobRow[]>([]);
@@ -1455,7 +1489,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
 
       setJobForm(emptyJobForm);
       setRequestStep(1);
-      setRequestPickerMode(null);
+      setRequestPicker(null);
       setPatientTab("home");
       setNotice("Care request submitted.");
       await loadPatientJobs();
@@ -1468,17 +1502,18 @@ export default function App({ product = "patient" }: { product?: MobileProductId
 
   function handleAppointmentPickerChange(event: DateTimePickerEvent, selectedValue?: Date) {
     if (Platform.OS !== "ios" || event.type === "dismissed") {
-      setRequestPickerMode(null);
+      setRequestPicker(null);
     }
-    if (event.type === "dismissed" || !selectedValue || !requestPickerMode) return;
+    if (event.type === "dismissed" || !selectedValue || !requestPicker) return;
 
-    const next = selectedAppointmentDate(jobForm.start_time) ?? defaultAppointmentDate();
-    if (requestPickerMode === "date") {
+    const currentValue = jobForm[requestPicker.field];
+    const next = selectedAppointmentDate(currentValue) ?? selectedAppointmentDate(jobForm.start_time) ?? defaultAppointmentDate();
+    if (requestPicker.mode === "date") {
       next.setFullYear(selectedValue.getFullYear(), selectedValue.getMonth(), selectedValue.getDate());
     } else {
       next.setHours(selectedValue.getHours(), selectedValue.getMinutes(), 0, 0);
     }
-    setJobForm((previous) => ({ ...previous, start_time: next.toISOString() }));
+    setJobForm((previous) => ({ ...previous, [requestPicker.field]: next.toISOString() }));
   }
 
   async function handleApply(job: JobRow) {
@@ -2006,6 +2041,14 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                   }
                   disabled={actionLoading}
                 />
+                {patientFocusJob && patientRequestDetail ? (
+                  <PatientRequestDetailPanel
+                    detail={patientRequestDetail}
+                    actionLoading={actionLoading}
+                    onCancel={() => confirmJobTransition(patientFocusJob, "cancel")}
+                    onComplete={() => confirmJobTransition(patientFocusJob, "complete")}
+                  />
+                ) : null}
                 {patientFocusJob ? (
                   <TouchableOpacity accessibilityRole="button" style={styles.activityPreview} onPress={() => setPatientTab("records")}>
                     <View style={styles.flex}>
@@ -2178,23 +2221,14 @@ export default function App({ product = "patient" }: { product?: MobileProductId
 
                     {requestStep === 2 ? (
                       <View>
-                        <Text style={styles.requestStepTitle}>Where and when?</Text>
-                        <Text style={styles.inputLabel}>Location</Text>
-                        <TextInput
-                          accessibilityLabel="Care request location"
-                          style={styles.input}
-                          placeholder="Service address or meeting location"
-                          placeholderTextColor={colors.mutedSoft}
-                          value={jobForm.address}
-                          onChangeText={(text) => setJobForm((prev) => ({ ...prev, address: text }))}
-                        />
+                        <Text style={styles.requestStepTitle}>When is the appointment?</Text>
                         <Text style={styles.inputLabel}>Requested date and time</Text>
                         <View style={styles.dateTimeRow}>
                           <TouchableOpacity
                             accessibilityRole="button"
                             accessibilityLabel={`Appointment date, ${appointmentDateLabel(jobForm.start_time)}`}
                             style={styles.dateTimeButton}
-                            onPress={() => setRequestPickerMode("date")}
+                            onPress={() => setRequestPicker({ field: "start_time", mode: "date" })}
                           >
                             <Ionicons name="calendar-outline" size={18} color={colors.accent} />
                             <View style={styles.dateTimeButtonCopy}>
@@ -2206,7 +2240,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                             accessibilityRole="button"
                             accessibilityLabel={`Appointment time, ${appointmentTimeLabel(jobForm.start_time)}`}
                             style={styles.dateTimeButton}
-                            onPress={() => setRequestPickerMode("time")}
+                            onPress={() => setRequestPicker({ field: "start_time", mode: "time" })}
                           >
                             <Ionicons name="time-outline" size={18} color={colors.accent} />
                             <View style={styles.dateTimeButtonCopy}>
@@ -2215,14 +2249,14 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                             </View>
                           </TouchableOpacity>
                         </View>
-                        {requestPickerMode ? (
+                        {requestPicker?.field === "start_time" ? (
                           <View style={styles.dateTimePickerPanel}>
                             <DateTimePicker
                               value={selectedAppointmentDate(jobForm.start_time) ?? defaultAppointmentDate()}
-                              mode={requestPickerMode}
+                              mode={requestPicker.mode}
                               display={Platform.OS === "ios" ? "spinner" : "default"}
-                              minimumDate={requestPickerMode === "date" ? new Date() : undefined}
-                              maximumDate={requestPickerMode === "date" ? new Date(new Date().setFullYear(new Date().getFullYear() + 2)) : undefined}
+                              minimumDate={requestPicker.mode === "date" ? new Date() : undefined}
+                              maximumDate={requestPicker.mode === "date" ? new Date(new Date().setFullYear(new Date().getFullYear() + 2)) : undefined}
                               minuteInterval={5}
                               onChange={handleAppointmentPickerChange}
                             />
@@ -2230,7 +2264,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                               <TouchableOpacity
                                 accessibilityRole="button"
                                 style={styles.dateTimeDoneButton}
-                                onPress={() => setRequestPickerMode(null)}
+                                onPress={() => setRequestPicker(null)}
                               >
                                 <Text style={styles.dateTimeDoneButtonText}>Done</Text>
                               </TouchableOpacity>
@@ -2243,7 +2277,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                             accessibilityLabel="Clear requested date and time"
                             style={styles.clearDateTimeButton}
                             onPress={() => {
-                              setRequestPickerMode(null);
+                              setRequestPicker(null);
                               setJobForm((previous) => ({ ...previous, start_time: "" }));
                             }}
                           >
@@ -2256,31 +2290,85 @@ export default function App({ product = "patient" }: { product?: MobileProductId
 
                     {requestStep === 3 ? (
                       <View>
-                        <Text style={styles.requestStepTitle}>Review and add contact details</Text>
+                        <Text style={styles.requestStepTitle}>Tell us about the residence</Text>
+                        <Text style={styles.inputLabel}>Residence type *</Text>
+                        <ChoiceGroup
+                          value={jobForm.residence_type}
+                          options={[
+                            { value: "apartment", label: "Apartment" },
+                            { value: "house", label: "House" },
+                            { value: "assisted_living", label: "Assisted living" },
+                            { value: "other", label: "Other" }
+                          ]}
+                          onChange={(residence_type) => setJobForm((prev) => ({ ...prev, residence_type }))}
+                        />
+                        <Text style={styles.inputLabel}>Street address *</Text>
+                        <TextInput style={styles.input} accessibilityLabel="Residence street address" placeholder="123 Main Street" placeholderTextColor={colors.mutedSoft} value={jobForm.street_address} onChangeText={(street_address) => setJobForm((prev) => ({ ...prev, street_address }))} />
+                        {jobForm.residence_type === "apartment" ? <>
+                          <Text style={styles.inputLabel}>Apartment or unit *</Text>
+                          <TextInput style={styles.input} accessibilityLabel="Apartment or unit" placeholder="Unit 4B" placeholderTextColor={colors.mutedSoft} value={jobForm.unit} onChangeText={(unit) => setJobForm((prev) => ({ ...prev, unit }))} />
+                        </> : null}
+                        <Text style={styles.inputLabel}>Building or community name</Text>
+                        <TextInput style={styles.input} accessibilityLabel="Building or community name" placeholder="Optional" placeholderTextColor={colors.mutedSoft} value={jobForm.building_name} onChangeText={(building_name) => setJobForm((prev) => ({ ...prev, building_name }))} />
+                        <Text style={styles.inputLabel}>City *</Text>
+                        <TextInput style={styles.input} accessibilityLabel="Residence city" value={jobForm.city} onChangeText={(city) => setJobForm((prev) => ({ ...prev, city }))} />
+                        <View style={styles.dateTimeRow}>
+                          <View style={styles.flex}><Text style={styles.inputLabel}>State *</Text><TextInput style={styles.input} accessibilityLabel="Residence state" autoCapitalize="characters" maxLength={2} value={jobForm.state} onChangeText={(state) => setJobForm((prev) => ({ ...prev, state }))} /></View>
+                          <View style={styles.flex}><Text style={styles.inputLabel}>ZIP *</Text><TextInput style={styles.input} accessibilityLabel="Residence ZIP code" keyboardType="number-pad" maxLength={10} value={jobForm.postal_code} onChangeText={(postal_code) => setJobForm((prev) => ({ ...prev, postal_code }))} /></View>
+                        </View>
+                        <Text style={styles.inputLabel}>Stairs</Text>
+                        <ChoiceGroup value={jobForm.stairs} options={[{ value: "none", label: "None" }, { value: "entrance", label: "Entrance" }, { value: "interior", label: "Inside" }, { value: "both", label: "Both" }, { value: "unknown", label: "Not sure" }]} onChange={(stairs) => setJobForm((prev) => ({ ...prev, stairs }))} />
+                        {jobForm.stairs !== "none" ? <><Text style={styles.inputLabel}>Elevator available?</Text><ChoiceGroup value={jobForm.elevator_available} options={[{ value: "yes", label: "Yes" }, { value: "no", label: "No" }, { value: "unknown", label: "Not sure" }]} onChange={(elevator_available) => setJobForm((prev) => ({ ...prev, elevator_available }))} /></> : null}
+                        <Text style={styles.inputLabel}>Where should the nurse meet you?</Text>
+                        <TextInput style={styles.input} accessibilityLabel="Meeting point" placeholder="Lobby, front entrance, apartment door" placeholderTextColor={colors.mutedSoft} value={jobForm.meeting_point} onChangeText={(meeting_point) => setJobForm((prev) => ({ ...prev, meeting_point }))} />
+                        <Text style={styles.inputLabel}>Parking notes</Text>
+                        <TextInput style={styles.input} accessibilityLabel="Parking notes" placeholder="Visitor parking or drop-off information" placeholderTextColor={colors.mutedSoft} value={jobForm.parking_notes} onChangeText={(parking_notes) => setJobForm((prev) => ({ ...prev, parking_notes }))} />
+                        <Text style={styles.inputLabel}>Arrival instructions</Text>
+                        <TextInput style={[styles.input, styles.multilineInput]} accessibilityLabel="Arrival instructions" multiline placeholder="Call on arrival or check in with front desk" placeholderTextColor={colors.mutedSoft} value={jobForm.arrival_instructions} onChangeText={(arrival_instructions) => setJobForm((prev) => ({ ...prev, arrival_instructions }))} />
+                        <Text style={styles.formPrivacyNote}>Never enter a door, gate, alarm, keypad, or lockbox code. Share time-limited access details by phone only after assignment.</Text>
+                      </View>
+                    ) : null}
+
+                    {requestStep === 4 ? (
+                      <View>
+                        <Text style={styles.requestStepTitle}>Plan transportation and support</Text>
+                        <Text style={styles.inputLabel}>Transportation to the appointment *</Text>
+                        <ChoiceGroup value={jobForm.transportation_mode} options={[{ value: "patient_arranged", label: "Already arranged" }, { value: "family_friend", label: "Family/friend" }, { value: "rideshare", label: "Rideshare" }, { value: "medical_transport", label: "Medical transport" }, { value: "public_transit", label: "Public transit" }, { value: "other", label: "Other" }, { value: "not_arranged", label: "Not arranged" }]} onChange={(transportation_mode) => setJobForm((prev) => ({ ...prev, transportation_mode }))} />
+                        <Text style={styles.inputLabel}>Transportation provider</Text>
+                        <TextInput style={styles.input} accessibilityLabel="Transportation provider" placeholder="Company or person, if known" placeholderTextColor={colors.mutedSoft} value={jobForm.transportation_provider} onChangeText={(transportation_provider) => setJobForm((prev) => ({ ...prev, transportation_provider }))} />
+                        <Text style={styles.inputLabel}>Pickup time</Text>
+                        <TouchableOpacity accessibilityRole="button" style={styles.dateTimeButton} onPress={() => setRequestPicker({ field: "pickup_time", mode: "time" })}>
+                          <Ionicons name="time-outline" size={18} color={colors.accent} />
+                          <View style={styles.dateTimeButtonCopy}><Text style={styles.dateTimeButtonLabel}>Pickup</Text><Text style={styles.dateTimeButtonValue}>{appointmentTimeLabel(jobForm.pickup_time)}</Text></View>
+                        </TouchableOpacity>
+                        {requestPicker?.field === "pickup_time" ? <View style={styles.dateTimePickerPanel}><DateTimePicker value={selectedAppointmentDate(jobForm.pickup_time) ?? selectedAppointmentDate(jobForm.start_time) ?? defaultAppointmentDate()} mode="time" display={Platform.OS === "ios" ? "spinner" : "default"} minuteInterval={5} onChange={handleAppointmentPickerChange} />{Platform.OS === "ios" ? <TouchableOpacity style={styles.dateTimeDoneButton} onPress={() => setRequestPicker(null)}><Text style={styles.dateTimeDoneButtonText}>Done</Text></TouchableOpacity> : null}</View> : null}
+                        <Text style={styles.inputLabel}>Return plan *</Text>
+                        <ChoiceGroup value={jobForm.return_plan} options={[{ value: "round_trip", label: "Round trip" }, { value: "one_way", label: "One way" }, { value: "family_pickup", label: "Family pickup" }, { value: "other", label: "Other" }, { value: "not_arranged", label: "Not arranged" }]} onChange={(return_plan) => setJobForm((prev) => ({ ...prev, return_plan }))} />
+                        <Text style={styles.inputLabel}>Transportation notes</Text>
+                        <TextInput style={[styles.input, styles.multilineInput]} accessibilityLabel="Transportation notes" multiline placeholder="Vehicle access, folding wheelchair, or return timing" placeholderTextColor={colors.mutedSoft} value={jobForm.transportation_notes} onChangeText={(transportation_notes) => setJobForm((prev) => ({ ...prev, transportation_notes }))} />
+                        <Text style={styles.inputLabel}>Mobility aids</Text>
+                        <View style={styles.choiceWrap}>{(["cane", "walker", "wheelchair", "scooter", "other"] as const).map((aid) => { const active = jobForm.mobility_aids.includes(aid); return <TouchableOpacity key={aid} style={[styles.choiceButton, styles.compactChoiceButton, active ? styles.choiceButtonActive : null]} onPress={() => setJobForm((prev) => ({ ...prev, mobility_aids: active ? prev.mobility_aids.filter((item) => item !== aid) : [...prev.mobility_aids, aid] }))}><Text style={[styles.choiceButtonText, active ? styles.choiceButtonTextActive : null]}>{aid[0].toUpperCase() + aid.slice(1)}</Text></TouchableOpacity>; })}</View>
+                        <Text style={styles.inputLabel}>Mobility or practical support notes</Text>
+                        <TextInput style={[styles.input, styles.multilineInput]} accessibilityLabel="Mobility and practical support notes" multiline placeholder="Walking distance, transfer assistance, or pace" placeholderTextColor={colors.mutedSoft} value={jobForm.mobility_notes} onChangeText={(mobility_notes) => setJobForm((prev) => ({ ...prev, mobility_notes }))} />
+                        <Text style={styles.inputLabel}>On-site contact name</Text>
+                        <TextInput style={styles.input} accessibilityLabel="On-site contact name" placeholder="Optional" placeholderTextColor={colors.mutedSoft} value={jobForm.onsite_contact_name} onChangeText={(onsite_contact_name) => setJobForm((prev) => ({ ...prev, onsite_contact_name }))} />
+                        <Text style={styles.inputLabel}>Relationship</Text>
+                        <TextInput style={styles.input} accessibilityLabel="On-site contact relationship" placeholder="Daughter, spouse, facility staff" placeholderTextColor={colors.mutedSoft} value={jobForm.onsite_contact_relationship} onChangeText={(onsite_contact_relationship) => setJobForm((prev) => ({ ...prev, onsite_contact_relationship }))} />
+                        <Text style={styles.inputLabel}>Phone</Text>
+                        <TextInput style={styles.input} accessibilityLabel="On-site contact phone" keyboardType="phone-pad" placeholder="Optional" placeholderTextColor={colors.mutedSoft} value={jobForm.onsite_contact_phone} onChangeText={(onsite_contact_phone) => setJobForm((prev) => ({ ...prev, onsite_contact_phone }))} />
+                      </View>
+                    ) : null}
+
+                    {requestStep === 5 ? (
+                      <View>
+                        <Text style={styles.requestStepTitle}>Review your request</Text>
                         <View style={styles.requestReview}>
                           <Text style={styles.requestReviewTitle}>{jobForm.title.trim() || "Care support request"}</Text>
-                          <Text style={styles.requestReviewMeta}>{jobForm.address.trim() || "Location to be confirmed"}</Text>
-                          <Text style={styles.requestReviewMeta}>{jobForm.start_time.trim() || "Time to be confirmed"}</Text>
+                          <Text style={styles.requestReviewMeta}>{[jobForm.street_address, jobForm.unit && `Unit ${jobForm.unit}`, jobForm.city, jobForm.state].filter(Boolean).join(", ") || "Residence to be confirmed"}</Text>
+                          <Text style={styles.requestReviewMeta}>{jobForm.start_time ? formatDate(jobForm.start_time) : "Time to be confirmed"}</Text>
+                          <Text style={styles.requestReviewMeta}>Transportation: {jobForm.transportation_mode.replace(/_/g, " ")}</Text>
+                          <Text style={styles.requestReviewMeta}>Return: {jobForm.return_plan.replace(/_/g, " ")}</Text>
                         </View>
-                        <Text style={styles.inputLabel}>Who should the caregiver contact or meet?</Text>
-                        <TextInput
-                          accessibilityLabel="Care request contact"
-                          style={styles.input}
-                          placeholder="Name and relationship only"
-                          placeholderTextColor={colors.mutedSoft}
-                          value={jobForm.contact_context}
-                          onChangeText={(text) => setJobForm((prev) => ({ ...prev, contact_context: text }))}
-                        />
-                        <Text style={styles.inputLabel}>Mobility or practical support notes</Text>
-                        <TextInput
-                          accessibilityLabel="Mobility and practical support notes"
-                          style={[styles.input, styles.multilineInput]}
-                          placeholder="Stairs, wheelchair access, transfer support, or other practical notes"
-                          placeholderTextColor={colors.mutedSoft}
-                          multiline
-                          value={jobForm.mobility_notes}
-                          onChangeText={(text) => setJobForm((prev) => ({ ...prev, mobility_notes: text }))}
-                        />
                         <View style={styles.requestSafetyNote}>
                           <Text style={styles.requestSafetyTitle}>Before you submit</Text>
                           <Text style={styles.requestSafetyBody}>NurseBridges is not an emergency service. Submitting sends this request to the beta care team for review.</Text>
@@ -2299,7 +2387,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                           <Text style={styles.requestBackButtonText}>Back</Text>
                         </TouchableOpacity>
                       ) : null}
-                      {requestStep < 3 ? (
+                      {requestStep < 5 ? (
                         <TouchableOpacity
                           accessibilityRole="button"
                           style={styles.requestContinueButton}
@@ -2307,6 +2395,16 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                             if (requestStep === 1 && jobForm.title.trim().length < 3) {
                               setError("Enter the support type using at least 3 characters.");
                               return;
+                            }
+                            if (requestStep === 3) {
+                              if (!jobForm.street_address.trim() || !jobForm.city.trim() || !jobForm.state.trim() || !jobForm.postal_code.trim()) {
+                                setError("Complete the required residence address fields before continuing.");
+                                return;
+                              }
+                              if (jobForm.residence_type === "apartment" && !jobForm.unit.trim()) {
+                                setError("Enter the apartment or unit number before continuing.");
+                                return;
+                              }
                             }
                             setError(null);
                             setRequestStep((requestStep + 1) as RequestStep);
@@ -2344,6 +2442,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                         fields={[
                           { label: "Assigned nurse", value: job.assigned_nurse_name ?? job.assigned_nurse_user_id },
                           { label: "Start", value: formatDate(job.start_time) },
+                          { label: "Residence", value: job.logistics ? [job.logistics.street_address, job.logistics.unit, job.logistics.city, job.logistics.state].filter(Boolean).join(", ") : formatServiceArea(job) },
                           { label: "Rate", value: formatRate(job.hourly_rate) }
                         ]}
                         actions={[
@@ -2405,6 +2504,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                         summary={workflowSummary(job)}
                         fields={[
                           { label: "Start", value: formatDate(job.start_time) },
+                          { label: "Service area", value: formatServiceArea(job) },
                           { label: "Rate", value: formatRate(job.hourly_rate) }
                         ]}
                         badge={applicationLabel}
@@ -2454,6 +2554,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                         summary={workflowSummary(job)}
                         fields={[
                           { label: "Start", value: formatDate(job.start_time) },
+                          { label: job.logistics ? "Residence" : "Service area", value: job.logistics ? [job.logistics.street_address, job.logistics.unit, job.logistics.city, job.logistics.state].filter(Boolean).join(", ") : formatServiceArea(job) },
                           { label: "Rate", value: formatRate(job.hourly_rate) }
                         ]}
                         badge={applicationLabel}
@@ -2531,9 +2632,15 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                 description={nurseRequestDetail.description}
                 fields={[
                   { label: "Application", value: nurseRequestDetail.applicationState },
-                  { label: "Location", value: nurseRequestDetail.location },
+                  { label: nurseRequestDetail.assignedToYou ? "Residence" : "Service area", value: nurseRequestDetail.location },
                   { label: "Start", value: nurseRequestDetail.start },
-                  { label: "Rate", value: nurseRequestDetail.rate }
+                  { label: "Rate", value: nurseRequestDetail.rate },
+                  ...(nurseRequestDetail.assignedToYou ? [
+                    { label: "Arrival and access", value: nurseRequestDetail.access },
+                    { label: "Mobility", value: nurseRequestDetail.mobility },
+                    { label: "Transportation", value: nurseRequestDetail.transportation },
+                    { label: "On-site contact", value: nurseRequestDetail.onsiteContact }
+                  ] : [])
                 ]}
                 actions={[
                   ...(nurseRequestDetail.canApply
@@ -2836,6 +2943,8 @@ return StyleSheet.create({
   requestProgressLabel: { color: colors.muted, fontSize: 10, fontWeight: "700" },
   requestProgressLabelActive: { color: colors.accent, fontWeight: "900" },
   requestStepTitle: { color: colors.ink, fontSize: 19, fontWeight: "900", letterSpacing: -0.4, marginBottom: 18 },
+  choiceWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 },
+  compactChoiceButton: { flex: 0, minHeight: 42, minWidth: 88, paddingHorizontal: 12 },
   formPrivacyNote: { color: colors.muted, fontSize: 11, lineHeight: 16, marginBottom: 4 },
   dateTimeRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
   dateTimeButton: {
