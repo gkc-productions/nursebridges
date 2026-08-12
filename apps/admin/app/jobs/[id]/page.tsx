@@ -14,6 +14,7 @@ type JobDetail = {
   hourly_rate: number | null;
   created_at: string;
   patient_name: string | null;
+  nurse_user_id: string | null;
   nurse_name: string | null;
 };
 
@@ -43,6 +44,13 @@ function formatDateTime(value: string | null) {
 function formatRate(value: number | null) {
   if (value === null || value === undefined) return "-";
   return `$${value}/hr`;
+}
+
+function formatEventType(value: string) {
+  return value
+    .replace(/^job_/, "")
+    .replaceAll("_", " ")
+    .replace(/^./, (letter) => letter.toUpperCase());
 }
 
 export default function JobDetailPage() {
@@ -131,7 +139,7 @@ export default function JobDetailPage() {
             <h3>{job.title}</h3>
             <p>Status: {job.status}</p>
             <p>Patient: {job.patient_name ?? "-"}</p>
-            <p>Nurse: {job.nurse_name ?? "Unassigned"}</p>
+            <p>Nurse: {job.nurse_name ?? job.nurse_user_id ?? "Unassigned"}</p>
             <p>Address: {job.address ?? "-"}</p>
             <p>Start: {formatDateTime(job.start_time)}</p>
             <p>Rate: {formatRate(job.hourly_rate)}</p>
@@ -218,7 +226,7 @@ export default function JobDetailPage() {
                   {events.map((event) => (
                     <tr key={event.id}>
                       <td>{new Date(event.created_at).toLocaleString()}</td>
-                      <td>{event.type}</td>
+                      <td>{formatEventType(event.type)}</td>
                       <td>{event.actor_name ?? "-"}</td>
                     </tr>
                   ))}

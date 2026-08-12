@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { adminJson } from "../../../../../lib/requestId";
 import { requireAdmin } from "../../../../../lib/adminAuth";
 import { cancelJobAsAdmin, completeJobAsAdmin } from "../../../../../lib/jobTerminalActions";
+import { buildJobTimeline, resolveAssignedNurseId } from "../../../../../lib/jobDetailView";
 import { supabaseAdmin } from "../../../../../lib/supabaseAdmin";
 
 type ApplicationRow = {
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 
   const { data: job, error } = await supabaseAdmin
     .from("jobs")
-    .select("id,status,patient_user_id,title,description,address,start_time,hourly_rate,created_at")
+    .select("id,status,patient_user_id,title,description,address,start_time,hourly_rate,created_at,updated_at")
     .eq("id", id)
     .single();
 
@@ -43,10 +44,10 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     return adminJson(request, { error: "Unable to load job" }, { status: 400 });
   }
 
-  const acceptedApplication = (applications ?? []).find(
-    (application) => (application as ApplicationRow).status === "accepted"
-  ) as ApplicationRow | undefined;
-  const nurseId = acceptedApplication?.nurse_user_id ?? null;
+  const nurseId = resolveAssignedNurseId(
+    job,
+    (applications ?? []) as ApplicationRow[]
+  );
 
   const applicantIds = (applications ?? []).map((application) => application.nurse_user_id).filter(Boolean);
   const profileIds = Array.from(new Set([job.patient_user_id, nurseId, ...applicantIds].filter(Boolean) as string[]));
@@ -92,6 +93,9 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     .eq("entity_id", job.id)
     .order("created_at", { ascending: true });
 
+  const patientName = identityLabels.get(job.patient_user_id ?? "") ?? null;
+  const nurseName = nurseId ? identityLabels.get(nurseId) ?? null : null;
+
   return adminJson(request, {
     job: {
       id: job.id,
@@ -102,8 +106,10 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       start_time: job.start_time ?? null,
       hourly_rate: job.hourly_rate ?? null,
       created_at: job.created_at,
-      patient_name: identityLabels.get(job.patient_user_id ?? "") ?? null,
-      nurse_name: nurseId ? identityLabels.get(nurseId) ?? null : null
+      updated_at: job.updated_at ?? null,
+      patient_name: patientName,
+      nurse_user_id: nurseId,
+      nurse_name: nurseName
     },
     applications: (applications ?? []).map((application) => {
       const row = application as ApplicationRow;
@@ -118,12 +124,12 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
         created_at: row.created_at
       };
     }),
-    events: (auditEvents ?? []).map((event) => ({
-      id: event.id,
-      type: event.action,
-      created_at: event.created_at,
-      actor_name: identityLabels.get(event.actor_id ?? "") ?? "Admin"
-    }))
+    events: buildJobTimeline({
+      job,
+      auditEvents: auditEvents ?? [],
+      identityLabels,
+      patientName
+    })
   });
 }
 

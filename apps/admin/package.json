@@ -8,7 +8,7 @@
     "start": "next start -p 3001",
     "lint": "echo \"(admin eslint pending; covered by typecheck)\"",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test test/workflowRules.test.ts test/jobTerminalActionsCore.test.ts test/jobAssignmentActionsCore.test.ts test/nurseVerificationActionsCore.test.ts"
+    "test": "node --import tsx --test test/workflowRules.test.ts test/jobTerminalActionsCore.test.ts test/jobAssignmentActionsCore.test.ts test/nurseVerificationActionsCore.test.ts test/jobDetailView.test.ts"
   },
   "dependencies": {
     "@nursebridge/shared": "workspace:*",
