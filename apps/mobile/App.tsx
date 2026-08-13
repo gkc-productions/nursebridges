@@ -909,6 +909,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
   const [verificationDocumentType, setVerificationDocumentType] = useState("license");
   const lastAutoLoadKey = useRef<string | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+  const requestCardYRef = useRef<number | null>(null);
   const passwordInputRef = useRef<TextInput>(null);
   const splashScale = useRef(new Animated.Value(0.82)).current;
   const splashOpacity = useRef(new Animated.Value(0.35)).current;
@@ -916,6 +917,23 @@ export default function App({ product = "patient" }: { product?: MobileProductId
   function revealActiveForm() {
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
   }
+
+  useEffect(() => {
+    if (role !== "patient") return;
+
+    const timeout = setTimeout(() => {
+      if (patientTab !== "new") {
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        return;
+      }
+
+      const requestCardY = requestCardYRef.current;
+      if (requestCardY === null) return;
+      scrollViewRef.current?.scrollTo({ y: Math.max(requestCardY - 12, 0), animated: true });
+    }, 120);
+
+    return () => clearTimeout(timeout);
+  }, [patientTab, requestStep, role]);
 
   useEffect(() => {
     const animation = Animated.loop(
@@ -951,7 +969,17 @@ export default function App({ product = "patient" }: { product?: MobileProductId
       }),
     [applicationsByJob, nurseJobs, session?.user.id]
   );
-  const latestNotification = useMemo(() => latestByCreatedAt(notifications), [notifications]);
+  const latestPatientNotification = useMemo(
+    () =>
+      patientFocusJob
+        ? latestByCreatedAt(
+            notifications.filter(
+              (notification) => notification.entity_type === "job" && notification.entity_id === patientFocusJob.id
+            )
+          )
+        : undefined,
+    [notifications, patientFocusJob]
+  );
   const patientRequestDetail = useMemo(() => {
     if (role !== "patient" || !patientFocusJob) return null;
     return buildPatientRequestDetailModel({
@@ -2015,7 +2043,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                   body={
                     patientFocusJob
                       ? `${workflowSummary(patientFocusJob)}. Latest update: ${
-                          latestNotification?.title ?? "No notification yet"
+                          latestPatientNotification?.title ?? "No update yet"
                         }.`
                       : "Use the request form below to describe the care support needed, where it should happen, and when."
                   }
@@ -2053,7 +2081,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                   <TouchableOpacity accessibilityRole="button" style={styles.activityPreview} onPress={() => setPatientTab("records")}>
                     <View style={styles.flex}>
                       <Text style={styles.eyebrow}>Latest activity</Text>
-                      <Text style={styles.activityPreviewTitle}>{latestNotification?.title ?? workflowSummary(patientFocusJob)}</Text>
+                      <Text style={styles.activityPreviewTitle}>{latestPatientNotification?.title ?? workflowSummary(patientFocusJob)}</Text>
                       <Text style={styles.activityPreviewBody}>Open your activity to see the full request timeline.</Text>
                     </View>
                     <Text style={styles.activityPreviewArrow}>›</Text>
@@ -2187,7 +2215,12 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                 ) : null}
 
                 {patientTab === "new" ? (
-                  <View style={styles.requestCard}>
+                  <View
+                    style={styles.requestCard}
+                    onLayout={(event) => {
+                      requestCardYRef.current = event.nativeEvent.layout.y;
+                    }}
+                  >
                     <Text style={styles.eyebrow}>Request care</Text>
                     <Text style={styles.requestTitle}>Let’s get the right support</Text>
                     <Text style={styles.sectionIntro}>A few clear details help the care team review your request.</Text>
