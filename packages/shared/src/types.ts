@@ -1,4 +1,4 @@
-import type { ApplicationStatus, JobStatus } from "./workflow";
+import type { ApplicationStatus, JobStatus, VisitEventType } from "./workflow";
 
 export type UserRole = "patient" | "nurse" | "admin";
 
@@ -58,3 +58,8 @@ export type Notification = {
   read_at: string | null;
   created_at: string;
 };
+
+export type CareCircleRecipient = { id: string; patient_user_id: string; job_id: string | null; display_name: string; relationship: string; email: string | null; phone: string | null; receive_milestones: boolean; receive_summary: boolean; consented_at: string; revoked_at: string | null };
+export type VisitEvent = { id: string; job_id: string; nurse_user_id: string; event_type: VisitEventType; occurred_at: string; patient_visible: boolean; note: string | null };
+export type VisitReport = { id: string; job_id: string; nurse_user_id: string; status: "draft" | "submitted" | "amended"; visit_summary: string | null; provider_instructions: string | null; follow_up_tasks: string | null; transportation_outcome: string | null; submitted_at: string | null };
+export type PatientVisitFeedback = { id: string; job_id: string; patient_user_id: string; rating: number; comments: string | null; would_rebook: boolean | null; prefer_same_nurse: boolean };

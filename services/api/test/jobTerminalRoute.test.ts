@@ -47,6 +47,10 @@ function createClient(results: Result[]) {
             operation.filters.push(["eq", column, value]);
             return builder;
           },
+          in(column: string, value: unknown[]) {
+            operation.filters.push(["in", column, value]);
+            return builder;
+          },
           maybeSingle() {
             return result;
           },
@@ -200,6 +204,25 @@ describe("job terminal routes", () => {
 
     assert.equal(response.statusCode, 403);
     assert.deepEqual(response.json(), { error: "Forbidden" });
+    assert.equal(admin.operations.filter((operation) => operation.update).length, 0);
+    await app.close();
+  });
+
+  it("requires a submitted report and final checkpoint before nurse completion", async () => {
+    const { app, admin } = await buildApp({
+      actor: createUser("nurse", "nurse-1"),
+      adminResults: [
+        { data: { id: "job-1", status: "assigned", patient_user_id: "patient-1", title: "Visit" }, error: null },
+        { data: { nurse_user_id: "nurse-1" }, error: null },
+        { data: null, error: null },
+        { data: { id: "report-1", status: "submitted" }, error: null }
+      ]
+    });
+
+    const response = await app.inject({ method: "PATCH", url: "/jobs/job-1/complete" });
+
+    assert.equal(response.statusCode, 400);
+    assert.deepEqual(response.json(), { error: "Submit the visit report and final checkpoint before completing care" });
     assert.equal(admin.operations.filter((operation) => operation.update).length, 0);
     await app.close();
   });

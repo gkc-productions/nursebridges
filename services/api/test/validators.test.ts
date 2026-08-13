@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { ZodError } from "zod";
-import { createJobSchema } from "../src/validators.ts";
+import {
+  careCircleRecipientSchema,
+  createJobSchema,
+  patientFeedbackSchema,
+  visitEventSchema,
+  visitReportSchema
+} from "../src/validators.ts";
 
 describe("createJobSchema", () => {
   it("accepts the mobile create-job payload and normalizes optional fields", () => {
@@ -123,5 +129,36 @@ describe("createJobSchema", () => {
       }),
       (error) => error instanceof ZodError && error.issues.some((issue) => issue.path.join(".") === "logistics.arrival_instructions")
     );
+  });
+});
+
+describe("visit coordination schemas", () => {
+  it("accepts ordered checkpoints and privacy-minimized reports", () => {
+    assert.deepEqual(visitEventSchema.parse({ event_type: "patient_handoff" }), {
+      event_type: "patient_handoff"
+    });
+    assert.deepEqual(visitReportSchema.parse({ status: "submitted", visit_summary: "Patient returned home safely." }), {
+      status: "submitted",
+      visit_summary: "Patient returned home safely."
+    });
+  });
+
+  it("rejects invalid ratings and incomplete care-circle consent", () => {
+    assert.throws(() => patientFeedbackSchema.parse({ rating: 6 }), ZodError);
+    assert.throws(
+      () => careCircleRecipientSchema.parse({ display_name: "Family", relationship: "Daughter", email: "family@example.com" }),
+      ZodError
+    );
+  });
+
+  it("requires a contact method and permits explicit consent", () => {
+    const recipient = careCircleRecipientSchema.parse({
+      display_name: "Family",
+      relationship: "Daughter",
+      email: "family@example.com",
+      receive_milestones: true
+    });
+    assert.equal(recipient.receive_milestones, true);
+    assert.equal(recipient.receive_summary, false);
   });
 });

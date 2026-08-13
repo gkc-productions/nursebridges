@@ -100,7 +100,6 @@ export function createJobTerminalActions(deps: TerminalActionDeps) {
     if (decision) {
       throw routeError(transitionMessage(decision), decision);
     }
-
     const applications = await fetchJobApplications(jobId);
     const plan = createCancelJobCommandPlan({
       actorRole,
@@ -163,6 +162,28 @@ export function createJobTerminalActions(deps: TerminalActionDeps) {
     });
     if (decision) {
       throw routeError(transitionMessage(decision), decision);
+    }
+    if (actorRole === "nurse") {
+      const [completedCheckpoint, submittedReport] = await Promise.all([
+        deps.supabaseAdmin
+          .from("visit_events")
+          .select("id")
+          .eq("job_id", jobId)
+          .eq("event_type", "visit_completed")
+          .maybeSingle(),
+        deps.supabaseAdmin
+          .from("visit_reports")
+          .select("id,status")
+          .eq("job_id", jobId)
+          .in("status", ["submitted", "amended"])
+          .maybeSingle()
+      ]);
+      if (completedCheckpoint.error || submittedReport.error) {
+        throw routeError("Unable to verify visit documentation", "storage_or_db_error");
+      }
+      if (!completedCheckpoint.data || !submittedReport.data) {
+        throw routeError("Submit the visit report and final checkpoint before completing care", "invalid_transition");
+      }
     }
     const acceptedNurseUserId = acceptedNurseId as string;
     const plan = createCompleteJobCommandPlan({

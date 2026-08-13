@@ -125,3 +125,37 @@ export const verifyNurseSchema = z.object({
   decision: z.enum(["approved", "rejected"]),
   rejection_reason: z.string().max(1000).optional()
 });
+
+export const visitEventSchema = z.object({
+  event_type: z.enum(["pre_visit_confirmed", "en_route", "arrived", "patient_met", "facility_check_in", "appointment_started", "appointment_ended", "return_started", "patient_handoff", "visit_completed", "escalation_requested"]),
+  occurred_at: optionalDateTime,
+  note: optionalTrimmedString(500)
+});
+
+export const visitReportSchema = z.object({
+  status: z.enum(["draft", "submitted"]),
+  visit_summary: optionalTrimmedString(4000),
+  provider_instructions: optionalTrimmedString(4000),
+  follow_up_tasks: optionalTrimmedString(2000),
+  transportation_outcome: optionalTrimmedString(1000)
+});
+
+export const patientFeedbackSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  comments: optionalTrimmedString(2000),
+  would_rebook: z.boolean().optional(),
+  prefer_same_nurse: z.boolean().default(false)
+});
+
+export const careCircleRecipientSchema = z.object({
+  job_id: z.string().uuid().optional(),
+  display_name: z.string().trim().min(1).max(120),
+  relationship: z.string().trim().min(1).max(80),
+  email: z.string().trim().email().max(254).optional(),
+  phone: optionalTrimmedString(30),
+  receive_milestones: z.boolean().default(false),
+  receive_summary: z.boolean().default(false)
+}).superRefine((value, context) => {
+  if (!value.email && !value.phone) context.addIssue({ code: "custom", path: ["email"], message: "Provide an email or phone number." });
+  if (!value.receive_milestones && !value.receive_summary) context.addIssue({ code: "custom", path: ["receive_milestones"], message: "Select at least one update category." });
+});

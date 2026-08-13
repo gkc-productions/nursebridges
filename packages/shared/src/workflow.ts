@@ -97,7 +97,7 @@ export function getCompleteJobDecision(input: {
     return "invalid_transition";
   }
 
-  if (input.actorRole === "patient" && input.patientUserId !== input.actorUserId) {
+  if (input.actorRole === "patient") {
     return "forbidden";
   }
 
@@ -105,7 +105,7 @@ export function getCompleteJobDecision(input: {
     return "forbidden";
   }
 
-  if (input.actorRole !== "patient" && input.actorRole !== "nurse" && input.actorRole !== "admin") {
+  if (input.actorRole !== "nurse" && input.actorRole !== "admin") {
     return "forbidden";
   }
 
@@ -347,4 +347,35 @@ export function buildTerminalJobNotifications(input: {
       entityId: input.jobId
     }))
   ].filter((notification): notification is TerminalJobNotification => Boolean(notification.userId));
+}
+
+export const visitEventTypes = [
+  "pre_visit_confirmed", "en_route", "arrived", "patient_met",
+  "facility_check_in", "appointment_started", "appointment_ended",
+  "return_started", "patient_handoff", "visit_completed", "escalation_requested"
+] as const;
+export type VisitEventType = (typeof visitEventTypes)[number];
+
+const visitEventRank = new Map<VisitEventType, number>([
+  ["pre_visit_confirmed", 0], ["en_route", 1], ["arrived", 2], ["patient_met", 3],
+  ["facility_check_in", 4], ["appointment_started", 5], ["appointment_ended", 6],
+  ["return_started", 7], ["patient_handoff", 8], ["visit_completed", 9]
+]);
+
+export function canRecordVisitEvent(input: { jobStatus: string; eventType: VisitEventType; previousEventType?: VisitEventType | null }) {
+  if (input.jobStatus !== "assigned") return false;
+  if (input.eventType === "escalation_requested") return true;
+  const nextRank = visitEventRank.get(input.eventType);
+  if (nextRank === undefined) return false;
+  if (!input.previousEventType || input.previousEventType === "escalation_requested") return nextRank === 0;
+  const previousRank = visitEventRank.get(input.previousEventType);
+  return previousRank !== undefined && nextRank === previousRank + 1;
+}
+
+export function canSubmitVisitReport(input: { jobStatus: string; latestEventType?: VisitEventType | null; visitSummary?: string | null }) {
+  return input.jobStatus === "assigned" && input.latestEventType === "patient_handoff" && Boolean(input.visitSummary?.trim());
+}
+
+export function canSubmitPatientFeedback(input: { jobStatus: string; rating: number }) {
+  return input.jobStatus === "completed" && Number.isInteger(input.rating) && input.rating >= 1 && input.rating <= 5;
 }

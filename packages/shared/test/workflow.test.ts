@@ -7,6 +7,9 @@ import {
   buildTerminalJobNotifications,
   canCancelJob,
   canCompleteJob,
+  canRecordVisitEvent,
+  canSubmitPatientFeedback,
+  canSubmitVisitReport,
   canSelectApplication,
   canWithdrawApplication,
   createAssignmentCommandPlan,
@@ -104,7 +107,7 @@ describe("shared workflow rules", () => {
     );
   });
 
-  it("classifies complete job decisions for patient, accepted nurse, admin, and stale states", () => {
+  it("allows only the accepted nurse or an admin to complete assigned care", () => {
     assert.equal(
       getCompleteJobDecision({
         actorRole: "patient",
@@ -113,7 +116,7 @@ describe("shared workflow rules", () => {
         patientUserId: "patient-1",
         acceptedNurseUserId: "nurse-1"
       }),
-      null
+      "forbidden"
     );
     assert.equal(
       getCompleteJobDecision({
@@ -355,5 +358,17 @@ describe("shared workflow rules", () => {
     assert.equal(getWorkflowErrorHttpStatus("invalid_transition"), 400);
     assert.equal(getWorkflowErrorHttpStatus("conflict"), 409);
     assert.equal(getWorkflowErrorHttpStatus("storage_or_db_error"), 500);
+  });
+
+  it("guards visit checkpoints, reporting, and patient feedback", () => {
+    assert.equal(canRecordVisitEvent({ jobStatus: "assigned", eventType: "pre_visit_confirmed" }), true);
+    assert.equal(canRecordVisitEvent({ jobStatus: "assigned", eventType: "arrived", previousEventType: "en_route" }), true);
+    assert.equal(canRecordVisitEvent({ jobStatus: "assigned", eventType: "appointment_started", previousEventType: "en_route" }), false);
+    assert.equal(canRecordVisitEvent({ jobStatus: "open", eventType: "pre_visit_confirmed" }), false);
+    assert.equal(canRecordVisitEvent({ jobStatus: "assigned", eventType: "escalation_requested", previousEventType: "arrived" }), true);
+    assert.equal(canSubmitVisitReport({ jobStatus: "assigned", latestEventType: "patient_handoff", visitSummary: "Returned safely." }), true);
+    assert.equal(canSubmitVisitReport({ jobStatus: "assigned", latestEventType: "appointment_ended", visitSummary: "Not handed off." }), false);
+    assert.equal(canSubmitPatientFeedback({ jobStatus: "completed", rating: 5 }), true);
+    assert.equal(canSubmitPatientFeedback({ jobStatus: "assigned", rating: 5 }), false);
   });
 });
