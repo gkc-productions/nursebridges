@@ -221,6 +221,7 @@ end;
 $$;
 
 revoke all on function public.create_care_request(jsonb) from public;
+revoke all on function public.create_care_request(jsonb) from anon;
 grant execute on function public.create_care_request(jsonb) to authenticated;
 
 comment on table public.job_logistics is
