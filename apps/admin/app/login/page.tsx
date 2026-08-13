@@ -18,7 +18,7 @@ export default function LoginPage() {
     const { error: signInError } = await signInWithPassword(email, password);
 
     if (signInError) {
-      setError(signInError.message);
+      setError("Unable to sign in. Check the operator email and password, then try again.");
       setLoading(false);
       return;
     }
