@@ -167,58 +167,100 @@ export default function JobDetailPage() {
 
   return (
     <section>
-      <h2>Job Detail</h2>
+      <div className="detail-heading">
+        <div>
+          <p className="eyebrow">Care coordination</p>
+          <h2>Care request detail</h2>
+          <p>Review the request, arrival plan, transportation, applicants, and activity before taking action.</p>
+        </div>
+        {job ? <span className="badge detail-status">{label(job.status)}</span> : null}
+      </div>
       {error ? <p className="notice">{error}</p> : null}
-      {job ? (
-        <div className="grid two">
+      {!job && !error ? (
+        <div className="loading-state" role="status" aria-live="polite">
+          <span className="loading-indicator" aria-hidden="true" />
           <div>
+            <strong>Loading care request</strong>
+            <p>Retrieving coordination details and the latest activity.</p>
+          </div>
+        </div>
+      ) : null}
+      {job ? (
+        <div className="request-detail-grid">
+          <article className="detail-panel request-summary-panel">
             <h3>{job.title}</h3>
-            <p>Status: {job.status}</p>
-            <p>Patient: {job.patient_name ?? "-"}</p>
-            <p>Nurse: {job.nurse_name ?? job.nurse_user_id ?? "Unassigned"}</p>
-            <p>Service area: {[job.service_city, job.service_state].filter(Boolean).join(", ") || "-"}</p>
-            <p>Start: {formatDateTime(job.start_time)}</p>
-            <p>Rate: {formatRate(job.hourly_rate)}</p>
-            <p>Created: {formatDateTime(job.created_at)}</p>
-            <p>Description: {job.description ?? "-"}</p>
-            {job.logistics ? (
-              <>
-                <h3>Private residence and arrival</h3>
-                <p>Residence: {label(job.logistics.residence_type)}</p>
-                <p>Address: {joined([job.logistics.building_name, job.logistics.street_address, job.logistics.unit ? `Unit ${job.logistics.unit}` : null, job.logistics.city, job.logistics.state, job.logistics.postal_code])}</p>
-                <p>Stairs / elevator: {joined([label(job.logistics.stairs), job.logistics.elevator_available === null ? null : job.logistics.elevator_available ? "Elevator available" : "No elevator"])}</p>
-                <p>Meeting point: {job.logistics.meeting_point ?? "-"}</p>
-                <p>Parking: {job.logistics.parking_notes ?? "-"}</p>
-                <p>Arrival instructions: {job.logistics.arrival_instructions ?? "-"}</p>
-                <h3>Mobility and contact</h3>
-                <p>Mobility aids: {job.logistics.mobility_aids.length ? job.logistics.mobility_aids.map(label).join(", ") : "None reported"}</p>
-                <p>Mobility notes: {job.logistics.mobility_notes ?? "-"}</p>
-                <p>On-site contact: {joined([job.logistics.onsite_contact_name, job.logistics.onsite_contact_relationship, job.logistics.onsite_contact_phone])}</p>
-                <h3>Transportation</h3>
-                <p>Outbound plan: {joined([label(job.logistics.transportation_mode), job.logistics.transportation_provider])}</p>
-                <p>Pickup: {formatDateTime(job.logistics.pickup_time)}</p>
-                <p>Return plan: {label(job.logistics.return_plan)}</p>
-                <p>Notes: {job.logistics.transportation_notes ?? "-"}</p>
-              </>
-            ) : <p>Structured logistics have not been recorded for this legacy request.</p>}
+            <dl className="detail-list">
+              <div><dt>Patient</dt><dd>{job.patient_name ?? "-"}</dd></div>
+              <div><dt>Assigned nurse</dt><dd>{job.nurse_name ?? job.nurse_user_id ?? "Unassigned"}</dd></div>
+              <div><dt>Service area</dt><dd>{[job.service_city, job.service_state].filter(Boolean).join(", ") || "-"}</dd></div>
+              <div><dt>Appointment</dt><dd>{formatDateTime(job.start_time)}</dd></div>
+              <div><dt>Rate</dt><dd>{formatRate(job.hourly_rate)}</dd></div>
+              <div><dt>Requested</dt><dd>{formatDateTime(job.created_at)}</dd></div>
+            </dl>
+            <div className="detail-note"><span>Request notes</span><p>{job.description ?? "No additional notes provided."}</p></div>
+          </article>
+
+          <article className="detail-panel request-actions-panel">
+            <p className="label">Request controls</p>
+            <h3>Coordinate next steps</h3>
+            <p>Actions are available only when the current care-request status allows them.</p>
             <div className="actions">
               <button
-                className="button"
+                className="button secondary"
                 onClick={() => updateJobStatus("cancelled")}
                 disabled={job.status !== "open" && job.status !== "assigned"}
               >
-                Cancel Job
+                Cancel request
               </button>
               <button
                 className="button"
                 onClick={() => updateJobStatus("completed")}
                 disabled={job.status !== "assigned"}
               >
-                Complete Job
+                Complete care
               </button>
             </div>
+          </article>
+
+          <div className="detail-span-full logistics-grid">
+            {job.logistics ? (
+              <>
+                <article className="detail-panel logistics-panel">
+                  <p className="label">Arrival plan</p>
+                  <h3>Residence and access</h3>
+                  <dl className="detail-list compact">
+                    <div><dt>Residence</dt><dd>{label(job.logistics.residence_type)}</dd></div>
+                    <div><dt>Address</dt><dd>{joined([job.logistics.building_name, job.logistics.street_address, job.logistics.unit ? `Unit ${job.logistics.unit}` : null, job.logistics.city, job.logistics.state, job.logistics.postal_code])}</dd></div>
+                    <div><dt>Stairs / elevator</dt><dd>{joined([label(job.logistics.stairs), job.logistics.elevator_available === null ? null : job.logistics.elevator_available ? "Elevator available" : "No elevator"])}</dd></div>
+                    <div><dt>Meeting point</dt><dd>{job.logistics.meeting_point ?? "-"}</dd></div>
+                    <div><dt>Parking</dt><dd>{job.logistics.parking_notes ?? "-"}</dd></div>
+                    <div><dt>Arrival instructions</dt><dd>{job.logistics.arrival_instructions ?? "-"}</dd></div>
+                  </dl>
+                </article>
+                <article className="detail-panel logistics-panel">
+                  <p className="label">Patient support</p>
+                  <h3>Mobility and contact</h3>
+                  <dl className="detail-list compact">
+                    <div><dt>Mobility aids</dt><dd>{job.logistics.mobility_aids.length ? job.logistics.mobility_aids.map(label).join(", ") : "None reported"}</dd></div>
+                    <div><dt>Mobility notes</dt><dd>{job.logistics.mobility_notes ?? "-"}</dd></div>
+                    <div><dt>On-site contact</dt><dd>{joined([job.logistics.onsite_contact_name, job.logistics.onsite_contact_relationship, job.logistics.onsite_contact_phone])}</dd></div>
+                  </dl>
+                </article>
+                <article className="detail-panel logistics-panel">
+                  <p className="label">Travel plan</p>
+                  <h3>Transportation</h3>
+                  <dl className="detail-list compact">
+                    <div><dt>Outbound plan</dt><dd>{joined([label(job.logistics.transportation_mode), job.logistics.transportation_provider])}</dd></div>
+                    <div><dt>Pickup</dt><dd>{formatDateTime(job.logistics.pickup_time)}</dd></div>
+                    <div><dt>Return plan</dt><dd>{label(job.logistics.return_plan)}</dd></div>
+                    <div><dt>Notes</dt><dd>{job.logistics.transportation_notes ?? "-"}</dd></div>
+                  </dl>
+                </article>
+              </>
+            ) : <article className="detail-panel"><p>Structured logistics have not been recorded for this legacy request.</p></article>}
           </div>
-          <div>
+
+          <article className="detail-panel detail-span-full">
             <h3>Applicants</h3>
             {applications.length === 0 ? (
               <p>No nurse applications yet.</p>
@@ -264,8 +306,8 @@ export default function JobDetailPage() {
                 </tbody>
               </table>
             )}
-          </div>
-          <div>
+          </article>
+          <article className="detail-panel detail-span-full">
             <h3>Status Timeline</h3>
             {events.length === 0 ? (
               <p>No events yet.</p>
@@ -289,11 +331,9 @@ export default function JobDetailPage() {
                 </tbody>
               </table>
             )}
-          </div>
+          </article>
         </div>
-      ) : (
-        <p>Loading...</p>
-      )}
+      ) : null}
     </section>
   );
 }
