@@ -44,12 +44,19 @@ import { lightColors, type ThemeColors } from "./src/theme";
 import type {
   ApplicationListResponse,
   ApplicationRow,
+  CareCircleListResponse,
+  CareCircleRecipientRow,
   JobListResponse,
   JobRow,
   NotificationListResponse,
   NotificationRow,
   NurseProfile,
+  PatientVisitFeedbackRow,
   UserRole,
+  VisitCoordinationResponse,
+  VisitEventRow,
+  VisitEventType,
+  VisitReportRow,
   VerificationDocumentListResponse,
   VerificationDocumentRow,
   VerificationDocumentUploadUrlResponse
@@ -68,7 +75,6 @@ import {
   careRequestStatusLabel,
   canApplyToCareRequest,
   canCancelJob,
-  canCompleteJob,
   emptyJobForm,
   formatServiceArea,
   formatDate,
@@ -86,6 +92,47 @@ type NurseTab = NurseWorkspaceTab;
 type EntryScreen = "welcome" | "start" | "signin" | "access" | "submitted";
 type RequestStep = 1 | 2 | 3 | 4 | 5;
 type RequestPickerState = { field: "start_time" | "pickup_time"; mode: "date" | "time" };
+
+const visitCheckpointTypes: VisitEventType[] = [
+  "pre_visit_confirmed",
+  "en_route",
+  "arrived",
+  "patient_met",
+  "facility_check_in",
+  "appointment_started",
+  "appointment_ended",
+  "return_started",
+  "patient_handoff",
+  "visit_completed"
+];
+
+const visitCheckpointLabels: Record<VisitEventType, string> = {
+  pre_visit_confirmed: "Pre-visit plan confirmed",
+  en_route: "En route",
+  arrived: "Arrived at residence",
+  patient_met: "Patient met",
+  facility_check_in: "Facility check-in",
+  appointment_started: "Appointment started",
+  appointment_ended: "Appointment ended",
+  return_started: "Return trip started",
+  patient_handoff: "Patient safely handed off",
+  visit_completed: "Visit documentation complete",
+  escalation_requested: "Escalation requested"
+};
+
+type VisitReportDraft = {
+  visit_summary: string;
+  provider_instructions: string;
+  follow_up_tasks: string;
+  transportation_outcome: string;
+};
+
+const emptyVisitReportDraft: VisitReportDraft = {
+  visit_summary: "",
+  provider_instructions: "",
+  follow_up_tasks: "",
+  transportation_outcome: ""
+};
 
 let colors: ThemeColors = lightColors;
 let styles = createStyles(colors);
@@ -312,16 +359,13 @@ function RequestDetailPanel({
 function PatientRequestDetailPanel({
   detail,
   actionLoading,
-  onCancel,
-  onComplete
+  onCancel
 }: {
   detail: ReturnType<typeof buildPatientRequestDetailModel>;
   actionLoading: boolean;
   onCancel: () => void;
-  onComplete: () => void;
 }) {
   const actions: RequestDetailAction[] = [
-    ...(detail.canComplete ? [{ label: "Mark complete", variant: "primary" as const, onPress: onComplete }] : []),
     ...(detail.canCancel ? [{ label: "Cancel request", variant: "secondary" as const, onPress: onCancel }] : [])
   ];
 
@@ -347,6 +391,205 @@ function PatientRequestDetailPanel({
       actionLoading={actionLoading}
       finalText="This request is final. Actions are closed, but the record stays visible."
     />
+  );
+}
+
+function NurseVisitExecutionPanel({
+  events,
+  report,
+  reportDraft,
+  actionLoading,
+  onReportChange,
+  onRecordEvent,
+  onSaveReport,
+  onEscalate,
+  onFinalize
+}: {
+  events: VisitEventRow[];
+  report: VisitReportRow | null;
+  reportDraft: VisitReportDraft;
+  actionLoading: boolean;
+  onReportChange: (field: keyof VisitReportDraft, value: string) => void;
+  onRecordEvent: (eventType: VisitEventType) => void;
+  onSaveReport: (status: "draft" | "submitted") => void;
+  onEscalate: () => void;
+  onFinalize: () => void;
+}) {
+  const recorded = new Set(events.filter((event) => event.event_type !== "escalation_requested").map((event) => event.event_type));
+  const nextCheckpoint = visitCheckpointTypes.find((eventType) => !recorded.has(eventType));
+  const handoffRecorded = recorded.has("patient_handoff");
+  const visitCompletedRecorded = recorded.has("visit_completed");
+  const reportSubmitted = report?.status === "submitted" || report?.status === "amended";
+  const canRecordNext = nextCheckpoint !== undefined && (nextCheckpoint !== "visit_completed" || reportSubmitted);
+
+  return (
+    <View style={styles.card}>
+      <SectionHeader eyebrow="Active visit" title="Visit execution and handoff" />
+      <Text style={styles.sectionIntro}>
+        Record each checkpoint when it actually happens. Do not enter diagnoses, full medical histories, or credentials.
+      </Text>
+      <View style={styles.timelinePanel}>
+        {visitCheckpointTypes.map((eventType) => (
+          <TimelineRow
+            key={eventType}
+            label={visitCheckpointLabels[eventType]}
+            state={recorded.has(eventType) ? "done" : nextCheckpoint === eventType ? "current" : "pending"}
+          />
+        ))}
+      </View>
+      {canRecordNext && nextCheckpoint ? (
+        <TouchableOpacity style={styles.button} onPress={() => onRecordEvent(nextCheckpoint)} disabled={actionLoading}>
+          <Text style={styles.buttonText}>Record: {visitCheckpointLabels[nextCheckpoint]}</Text>
+        </TouchableOpacity>
+      ) : nextCheckpoint === "visit_completed" && !reportSubmitted ? (
+        <Text style={styles.emptyText}>Submit the visit report before closing documentation.</Text>
+      ) : null}
+      {visitCompletedRecorded && reportSubmitted ? (
+        <TouchableOpacity style={styles.button} onPress={onFinalize} disabled={actionLoading}>
+          <Text style={styles.buttonText}>Finalize care request</Text>
+        </TouchableOpacity>
+      ) : null}
+
+      {handoffRecorded ? (
+        <View style={styles.supportPanel}>
+          <Text style={styles.supportTitle}>Structured visit report</Text>
+          <Text style={styles.inputLabel}>What support was provided? *</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            multiline
+            value={reportDraft.visit_summary}
+            onChangeText={(value) => onReportChange("visit_summary", value)}
+            placeholder="Describe coordination and accompaniment performed"
+            placeholderTextColor={colors.mutedSoft}
+          />
+          <Text style={styles.inputLabel}>Provider instructions</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            multiline
+            value={reportDraft.provider_instructions}
+            onChangeText={(value) => onReportChange("provider_instructions", value)}
+            placeholder="Record only instructions explicitly provided, including the source"
+            placeholderTextColor={colors.mutedSoft}
+          />
+          <Text style={styles.inputLabel}>Follow-up tasks</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            multiline
+            value={reportDraft.follow_up_tasks}
+            onChangeText={(value) => onReportChange("follow_up_tasks", value)}
+            placeholder="Scheduling, pharmacy, transport, or family follow-up"
+            placeholderTextColor={colors.mutedSoft}
+          />
+          <Text style={styles.inputLabel}>Transportation outcome</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            multiline
+            value={reportDraft.transportation_outcome}
+            onChangeText={(value) => onReportChange("transportation_outcome", value)}
+            placeholder="How the outbound and return plan concluded"
+            placeholderTextColor={colors.mutedSoft}
+          />
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.detailSecondaryAction} onPress={() => onSaveReport("draft")} disabled={actionLoading}>
+              <Text style={styles.detailSecondaryActionText}>Save draft</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.detailPrimaryAction} onPress={() => onSaveReport("submitted")} disabled={actionLoading || !reportDraft.visit_summary.trim()}>
+              <Text style={styles.detailPrimaryActionText}>{reportSubmitted ? "Update report" : "Submit report"}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
+      <TouchableOpacity style={styles.secondaryButton} onPress={onEscalate} disabled={actionLoading}>
+        <Text style={styles.secondaryButtonText}>Request operational escalation</Text>
+      </TouchableOpacity>
+      <Text style={styles.formPrivacyNote}>For emergencies, use local emergency services. This button alerts the NurseBridges operations workflow only.</Text>
+    </View>
+  );
+}
+
+function PatientVisitOutcomePanel({
+  report,
+  feedback,
+  rating,
+  comments,
+  wouldRebook,
+  preferSameNurse,
+  actionLoading,
+  onRating,
+  onComments,
+  onWouldRebook,
+  onPreferSameNurse,
+  onSubmit
+}: {
+  report: VisitReportRow | null;
+  feedback: PatientVisitFeedbackRow | null;
+  rating: number;
+  comments: string;
+  wouldRebook: boolean | null;
+  preferSameNurse: boolean;
+  actionLoading: boolean;
+  onRating: (rating: number) => void;
+  onComments: (comments: string) => void;
+  onWouldRebook: (value: boolean) => void;
+  onPreferSameNurse: (value: boolean) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <View style={styles.card}>
+      <SectionHeader eyebrow="After the visit" title="Summary and feedback" />
+      {report && report.status !== "draft" ? (
+        <View style={styles.supportPanel}>
+          <FieldRow label="Visit summary" value={report.visit_summary} />
+          <FieldRow label="Provider instructions" value={report.provider_instructions} />
+          <FieldRow label="Follow-up tasks" value={report.follow_up_tasks} />
+          <FieldRow label="Transportation outcome" value={report.transportation_outcome} />
+        </View>
+      ) : (
+        <Text style={styles.emptyText}>The nurse’s submitted visit summary will appear here.</Text>
+      )}
+      <Text style={styles.inputLabel}>Rate your experience</Text>
+      <View style={styles.choiceWrap}>
+        {[1, 2, 3, 4, 5].map((value) => (
+          <TouchableOpacity key={value} style={[styles.choiceButton, styles.compactChoiceButton, rating === value ? styles.choiceButtonActive : null]} onPress={() => onRating(value)}>
+            <Text style={[styles.choiceButtonText, rating === value ? styles.choiceButtonTextActive : null]}>{value}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <Text style={styles.inputLabel}>Private feedback for the care team</Text>
+      <TextInput style={[styles.input, styles.multilineInput]} multiline value={comments} onChangeText={onComments} placeholder="What worked well, or what should improve?" placeholderTextColor={colors.mutedSoft} />
+      <Text style={styles.inputLabel}>Would you use NurseBridges again?</Text>
+      <ChoiceGroup value={wouldRebook === true ? "yes" : wouldRebook === false ? "no" : "unsure"} options={[{ value: "yes", label: "Yes" }, { value: "no", label: "No" }, { value: "unsure", label: "Not sure" }]} onChange={(value) => value !== "unsure" && onWouldRebook(value === "yes")} />
+      <TouchableOpacity style={[styles.choiceButton, preferSameNurse ? styles.choiceButtonActive : null]} onPress={() => onPreferSameNurse(!preferSameNurse)}>
+        <Text style={[styles.choiceButtonText, preferSameNurse ? styles.choiceButtonTextActive : null]}>Prefer the same nurse next time</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.button} onPress={onSubmit} disabled={actionLoading || rating < 1}>
+        <Text style={styles.buttonText}>{feedback ? "Update feedback" : "Submit feedback"}</Text>
+      </TouchableOpacity>
+      <Text style={styles.formPrivacyNote}>Your feedback and rebooking preference are visible to NurseBridges administrators, not the nurse.</Text>
+    </View>
+  );
+}
+
+function PatientVisitProgressPanel({ events }: { events: VisitEventRow[] }) {
+  const recorded = new Set(events.map((event) => event.event_type));
+  const visibleCheckpoints = visitCheckpointTypes.filter((eventType) => eventType !== "visit_completed");
+  const next = visibleCheckpoints.find((eventType) => !recorded.has(eventType));
+  return (
+    <View style={styles.card}>
+      <SectionHeader eyebrow="Visit day" title="Live care progress" />
+      <Text style={styles.sectionIntro}>Operational milestones appear here as your nurse records them.</Text>
+      <View style={styles.timelinePanel}>
+        {visibleCheckpoints.map((eventType) => (
+          <TimelineRow
+            key={eventType}
+            label={visitCheckpointLabels[eventType]}
+            state={recorded.has(eventType) ? "done" : next === eventType ? "current" : "pending"}
+          />
+        ))}
+      </View>
+      {events.some((event) => event.event_type === "escalation_requested") ? <Text style={styles.error}>The operations team has been asked to review this visit.</Text> : null}
+    </View>
   );
 }
 
@@ -904,6 +1147,18 @@ export default function App({ product = "patient" }: { product?: MobileProductId
   const [selectedJob, setSelectedJob] = useState<JobRow | null>(null);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [verificationDocuments, setVerificationDocuments] = useState<VerificationDocumentRow[]>([]);
+  const [visitEvents, setVisitEvents] = useState<VisitEventRow[]>([]);
+  const [visitReport, setVisitReport] = useState<VisitReportRow | null>(null);
+  const [visitFeedback, setVisitFeedback] = useState<PatientVisitFeedbackRow | null>(null);
+  const [visitReportDraft, setVisitReportDraft] = useState<VisitReportDraft>(emptyVisitReportDraft);
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackComments, setFeedbackComments] = useState("");
+  const [feedbackWouldRebook, setFeedbackWouldRebook] = useState<boolean | null>(null);
+  const [feedbackPreferSameNurse, setFeedbackPreferSameNurse] = useState(false);
+  const [careCircleRecipients, setCareCircleRecipients] = useState<CareCircleRecipientRow[]>([]);
+  const [careCircleName, setCareCircleName] = useState("");
+  const [careCircleRelationship, setCareCircleRelationship] = useState("");
+  const [careCircleEmail, setCareCircleEmail] = useState("");
 
   const [jobForm, setJobForm] = useState(emptyJobForm);
   const [verificationDocumentType, setVerificationDocumentType] = useState("license");
@@ -1145,6 +1400,11 @@ export default function App({ product = "patient" }: { product?: MobileProductId
       setSelectedJob(null);
       setNotifications([]);
       setVerificationDocuments([]);
+      setVisitEvents([]);
+      setVisitReport(null);
+      setVisitFeedback(null);
+      setVisitReportDraft(emptyVisitReportDraft);
+      setCareCircleRecipients([]);
 
       if (!session) {
         lastAutoLoadKey.current = null;
@@ -1235,6 +1495,24 @@ export default function App({ product = "patient" }: { product?: MobileProductId
 
   useEffect(() => {
     if (!session || !baseUrl) return;
+    const job = role === "nurse" ? selectedJob : role === "patient" ? patientFocusJob : null;
+    if (!job || (role === "nurse" && job.assigned_nurse_user_id !== session.user.id)) {
+      setVisitEvents([]);
+      setVisitReport(null);
+      setVisitFeedback(null);
+      return;
+    }
+    void loadVisitCoordination(job.id);
+  }, [baseUrl, patientFocusJob?.id, role, selectedJob?.id, session?.user.id]);
+
+  useEffect(() => {
+    if (role === "patient" && patientTab === "account" && session && baseUrl) {
+      void loadCareCircle();
+    }
+  }, [baseUrl, patientTab, role, session?.user.id]);
+
+  useEffect(() => {
+    if (!session || !baseUrl) return;
     void registerForPushNotificationsAsync(session, baseUrl);
   }, [baseUrl, session]);
 
@@ -1315,6 +1593,86 @@ export default function App({ product = "patient" }: { product?: MobileProductId
       setVerificationDocuments(data.documents ?? []);
     } catch {
       setError("Unable to load verification documents.");
+    }
+  }
+
+  async function loadVisitCoordination(jobId: string) {
+    if (!session) return;
+    try {
+      const data = await apiFetch<VisitCoordinationResponse>(baseUrl, session, `/jobs/${jobId}/visit`);
+      setVisitEvents(data.events ?? []);
+      setVisitReport(data.report ?? null);
+      setVisitFeedback(data.feedback ?? null);
+      setVisitReportDraft({
+        visit_summary: data.report?.visit_summary ?? "",
+        provider_instructions: data.report?.provider_instructions ?? "",
+        follow_up_tasks: data.report?.follow_up_tasks ?? "",
+        transportation_outcome: data.report?.transportation_outcome ?? ""
+      });
+      if (data.feedback) {
+        setFeedbackRating(data.feedback.rating);
+        setFeedbackComments(data.feedback.comments ?? "");
+        setFeedbackWouldRebook(data.feedback.would_rebook);
+        setFeedbackPreferSameNurse(data.feedback.prefer_same_nurse);
+      }
+    } catch (err) {
+      setError(formatApiErrorMessage("Unable to load visit progress.", err));
+    }
+  }
+
+  async function loadCareCircle() {
+    if (!session || role !== "patient") return;
+    try {
+      const data = await apiFetch<CareCircleListResponse>(baseUrl, session, "/care-circle");
+      setCareCircleRecipients(data.recipients ?? []);
+    } catch (err) {
+      setError(formatApiErrorMessage("Unable to load your care circle.", err));
+    }
+  }
+
+  async function addCareCircleRecipient() {
+    if (!session || role !== "patient") return;
+    if (!careCircleName.trim() || !careCircleRelationship.trim() || !careCircleEmail.trim()) {
+      setError("Enter a name, relationship, and email address.");
+      return;
+    }
+    setActionLoading(true);
+    setError(null);
+    try {
+      await apiFetch(baseUrl, session, "/care-circle", {
+        method: "POST",
+        body: JSON.stringify({
+          display_name: careCircleName,
+          relationship: careCircleRelationship,
+          email: careCircleEmail,
+          receive_milestones: true,
+          receive_summary: true
+        })
+      });
+      setCareCircleName("");
+      setCareCircleRelationship("");
+      setCareCircleEmail("");
+      setNotice("Care-circle consent saved.");
+      await loadCareCircle();
+    } catch (err) {
+      setError(formatApiErrorMessage("Unable to add this care-circle recipient.", err));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function revokeCareCircleRecipient(recipientId: string) {
+    if (!session || role !== "patient") return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      await apiFetch(baseUrl, session, `/care-circle/${recipientId}`, { method: "DELETE" });
+      setNotice("Care-circle access revoked.");
+      await loadCareCircle();
+    } catch (err) {
+      setError(formatApiErrorMessage("Unable to revoke this recipient.", err));
+    } finally {
+      setActionLoading(false);
     }
   }
 
@@ -1567,6 +1925,87 @@ export default function App({ product = "patient" }: { product?: MobileProductId
       await loadNurseJobs();
     } catch (err) {
       setError(formatApiErrorMessage("Unable to apply to care request.", err));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function recordVisitEvent(job: JobRow, eventType: VisitEventType) {
+    if (!session || role !== "nurse") return;
+    setActionLoading(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await apiFetch(baseUrl, session, `/jobs/${job.id}/visit/events`, {
+        method: "POST",
+        body: JSON.stringify({ event_type: eventType })
+      });
+      if (eventType === "visit_completed") {
+        await apiFetch(baseUrl, session, `/jobs/${job.id}/complete`, { method: "PATCH" });
+        setNotice("Visit documented and care request completed.");
+        await loadNurseJobs();
+      } else {
+        setNotice(`${visitCheckpointLabels[eventType]} recorded.`);
+      }
+      await loadVisitCoordination(job.id);
+    } catch (err) {
+      setError(formatApiErrorMessage("Unable to record this visit checkpoint.", err));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function saveVisitReport(job: JobRow, status: "draft" | "submitted") {
+    if (!session || role !== "nurse") return;
+    if (status === "submitted" && !visitReportDraft.visit_summary.trim()) {
+      setError("Add a visit summary before submitting the report.");
+      return;
+    }
+    setActionLoading(true);
+    setError(null);
+    try {
+      await apiFetch(baseUrl, session, `/jobs/${job.id}/visit/report`, {
+        method: "PUT",
+        body: JSON.stringify({ status, ...visitReportDraft })
+      });
+      setNotice(status === "submitted" ? "Visit report submitted." : "Visit report draft saved.");
+      await loadVisitCoordination(job.id);
+    } catch (err) {
+      setError(formatApiErrorMessage("Unable to save the visit report.", err));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  function confirmVisitEscalation(job: JobRow) {
+    Alert.alert(
+      "Request operational support?",
+      "This records an escalation for the NurseBridges operations team. Call local emergency services for urgent medical or safety needs.",
+      [
+        { text: "Go back", style: "cancel" },
+        { text: "Request support", onPress: () => void recordVisitEvent(job, "escalation_requested") }
+      ]
+    );
+  }
+
+  async function submitPatientFeedback(job: JobRow) {
+    if (!session || role !== "patient") return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      await apiFetch(baseUrl, session, `/jobs/${job.id}/feedback`, {
+        method: "PUT",
+        body: JSON.stringify({
+          rating: feedbackRating,
+          comments: feedbackComments,
+          would_rebook: feedbackWouldRebook ?? undefined,
+          prefer_same_nurse: feedbackPreferSameNurse
+        })
+      });
+      setNotice("Thank you. Your private feedback was saved.");
+      await loadVisitCoordination(job.id);
+    } catch (err) {
+      setError(formatApiErrorMessage("Unable to save feedback.", err));
     } finally {
       setActionLoading(false);
     }
@@ -2050,16 +2489,12 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                   primaryLabel={
                     !patientFocusJob
                       ? "Request care support"
-                      : patientFocusJob && canCompleteJob(patientFocusJob, role, session.user.id)
-                        ? "Mark complete"
-                        : undefined
+                      : undefined
                   }
                   onPrimary={
                     !patientFocusJob
                       ? () => setPatientTab("new")
-                      : patientFocusJob && canCompleteJob(patientFocusJob, role, session.user.id)
-                        ? () => confirmJobTransition(patientFocusJob, "complete")
-                        : undefined
+                      : undefined
                   }
                   secondaryLabel={patientFocusJob && canCancelJob(patientFocusJob) ? "Cancel request" : undefined}
                   onSecondary={
@@ -2074,7 +2509,23 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                     detail={patientRequestDetail}
                     actionLoading={actionLoading}
                     onCancel={() => confirmJobTransition(patientFocusJob, "cancel")}
-                    onComplete={() => confirmJobTransition(patientFocusJob, "complete")}
+                  />
+                ) : null}
+                {patientFocusJob?.status === "assigned" ? <PatientVisitProgressPanel events={visitEvents} /> : null}
+                {patientFocusJob?.status === "completed" ? (
+                  <PatientVisitOutcomePanel
+                    report={visitReport}
+                    feedback={visitFeedback}
+                    rating={feedbackRating}
+                    comments={feedbackComments}
+                    wouldRebook={feedbackWouldRebook}
+                    preferSameNurse={feedbackPreferSameNurse}
+                    actionLoading={actionLoading}
+                    onRating={setFeedbackRating}
+                    onComments={setFeedbackComments}
+                    onWouldRebook={setFeedbackWouldRebook}
+                    onPreferSameNurse={setFeedbackPreferSameNurse}
+                    onSubmit={() => void submitPatientFeedback(patientFocusJob)}
                   />
                 ) : null}
                 {patientFocusJob ? (
@@ -2117,20 +2568,6 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                       ? `${workflowSummary(nurseFocusJob)}. Select a request below to review details before applying or completing assigned work.`
                       : "No open or assigned requests are available right now. Refresh before a scheduled beta test."
                     : "Upload the requested verification document for admin review. This beta does not claim background-check or license-verification completion."
-                }
-                primaryLabel={
-                  isApprovedNurse &&
-                  nurseFocusJob &&
-                  canCompleteJob(nurseFocusJob, role, session.user.id)
-                    ? "Complete assigned care"
-                    : undefined
-                }
-                onPrimary={
-                  isApprovedNurse &&
-                  nurseFocusJob &&
-                  canCompleteJob(nurseFocusJob, role, session.user.id)
-                    ? () => confirmJobTransition(nurseFocusJob, "complete")
-                    : undefined
                 }
                 secondaryLabel={!isApprovedNurse ? "Choose document" : nurseFocusJob ? "View details" : "Refresh"}
                 onSecondary={
@@ -2202,16 +2639,42 @@ export default function App({ product = "patient" }: { product?: MobileProductId
             {role === "patient" ? (
               <>
                 {patientTab === "account" ? (
-                  <AccountPanel
-                    email={session.user.email}
-                    role={role}
-                    baseUrl={baseUrl}
-                    nurseProfile={nurseProfile}
-                    supportRows={workflowEvidence.rows}
-                    actionLoading={actionLoading}
-                    onSignOut={handleSignOut}
-                    onCopySupport={copyWorkflowEvidence}
-                  />
+                  <>
+                    <View style={styles.card}>
+                      <SectionHeader eyebrow="Consent" title="Care circle" actionLabel="Refresh" onAction={loadCareCircle} disabled={actionLoading} />
+                      <Text style={styles.sectionIntro}>Choose who may receive visit milestones and the submitted coordination summary. You can revoke access at any time.</Text>
+                      <Text style={styles.inputLabel}>Name *</Text>
+                      <TextInput style={styles.input} value={careCircleName} onChangeText={setCareCircleName} placeholder="Family member or trusted person" placeholderTextColor={colors.mutedSoft} />
+                      <Text style={styles.inputLabel}>Relationship *</Text>
+                      <TextInput style={styles.input} value={careCircleRelationship} onChangeText={setCareCircleRelationship} placeholder="Daughter, spouse, caregiver" placeholderTextColor={colors.mutedSoft} />
+                      <Text style={styles.inputLabel}>Email *</Text>
+                      <TextInput style={styles.input} value={careCircleEmail} onChangeText={setCareCircleEmail} keyboardType="email-address" autoCapitalize="none" placeholder="name@example.com" placeholderTextColor={colors.mutedSoft} />
+                      <TouchableOpacity style={styles.button} onPress={addCareCircleRecipient} disabled={actionLoading}>
+                        <Text style={styles.buttonText}>Give consent and add</Text>
+                      </TouchableOpacity>
+                      {careCircleRecipients.map((recipient) => (
+                        <View key={recipient.id} style={styles.jobCard}>
+                          <Text style={styles.jobTitle}>{recipient.display_name}</Text>
+                          <FieldRow label="Relationship" value={recipient.relationship} />
+                          <FieldRow label="Updates" value={[recipient.receive_milestones ? "Milestones" : null, recipient.receive_summary ? "Summary" : null].filter(Boolean).join(" and ")} />
+                          <TouchableOpacity style={styles.detailSecondaryAction} onPress={() => void revokeCareCircleRecipient(recipient.id)} disabled={actionLoading}>
+                            <Text style={styles.detailSecondaryActionText}>Revoke access</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                      <Text style={styles.formPrivacyNote}>This records consent; automatic email or text delivery will be enabled only after the notification service is verified.</Text>
+                    </View>
+                    <AccountPanel
+                      email={session.user.email}
+                      role={role}
+                      baseUrl={baseUrl}
+                      nurseProfile={nurseProfile}
+                      supportRows={workflowEvidence.rows}
+                      actionLoading={actionLoading}
+                      onSignOut={handleSignOut}
+                      onCopySupport={copyWorkflowEvidence}
+                    />
+                  </>
                 ) : null}
 
                 {patientTab === "new" ? (
@@ -2488,15 +2951,6 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                                 }
                               ]
                             : []),
-                          ...(canCompleteJob(job, role, session.user.id)
-                            ? [
-                                {
-                                  label: "Mark complete",
-                                  variant: "primary" as const,
-                                  onPress: () => confirmJobTransition(job, "complete")
-                                }
-                              ]
-                            : [])
                         ]}
                         actionLoading={actionLoading}
                       />
@@ -2593,17 +3047,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                         badge={applicationLabel}
                         selected={selectedJob?.id === job.id}
                         onPress={() => setSelectedJob(job)}
-                        actions={
-                          job.status === "assigned" && job.assigned_nurse_user_id === session.user.id
-                            ? [
-                                {
-                                  label: "Complete care",
-                                  variant: "primary" as const,
-                                  onPress: () => confirmJobTransition(job, "complete")
-                                }
-                              ]
-                            : []
-                        }
+                        actions={[]}
                         actionLoading={actionLoading}
                       />
                     );
@@ -2685,18 +3129,23 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                         }
                       ]
                     : []),
-                  ...(nurseRequestDetail.canComplete
-                    ? [
-                        {
-                          label: "Complete care",
-                          variant: "secondary" as const,
-                          onPress: () => confirmJobTransition(selectedJob, "complete")
-                        }
-                      ]
-                    : [])
                 ]}
                 actionLoading={actionLoading}
                 finalText="No action is available for this request right now."
+              />
+            ) : null}
+
+            {role === "nurse" && nurseTab === "schedule" && selectedJob?.status === "assigned" && selectedJob.assigned_nurse_user_id === session.user.id ? (
+              <NurseVisitExecutionPanel
+                events={visitEvents}
+                report={visitReport}
+                reportDraft={visitReportDraft}
+                actionLoading={actionLoading}
+                onReportChange={(field, value) => setVisitReportDraft((current) => ({ ...current, [field]: value }))}
+                onRecordEvent={(eventType) => void recordVisitEvent(selectedJob, eventType)}
+                onSaveReport={(status) => void saveVisitReport(selectedJob, status)}
+                onEscalate={() => confirmVisitEscalation(selectedJob)}
+                onFinalize={() => void handleJobTransition(selectedJob, "complete")}
               />
             ) : null}
 

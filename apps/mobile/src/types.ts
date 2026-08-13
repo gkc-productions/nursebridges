@@ -98,6 +98,73 @@ export type VerificationDocumentUploadUrlResponse = {
   token: string;
 };
 
+export type VisitEventType =
+  | "pre_visit_confirmed"
+  | "en_route"
+  | "arrived"
+  | "patient_met"
+  | "facility_check_in"
+  | "appointment_started"
+  | "appointment_ended"
+  | "return_started"
+  | "patient_handoff"
+  | "visit_completed"
+  | "escalation_requested";
+
+export type VisitEventRow = {
+  id: string;
+  job_id: string;
+  nurse_user_id: string;
+  event_type: VisitEventType;
+  occurred_at: string;
+  patient_visible: boolean;
+  note: string | null;
+};
+
+export type VisitReportRow = {
+  id: string;
+  job_id: string;
+  nurse_user_id: string;
+  status: "draft" | "submitted" | "amended";
+  visit_summary: string | null;
+  provider_instructions: string | null;
+  follow_up_tasks: string | null;
+  transportation_outcome: string | null;
+  submitted_at: string | null;
+  updated_at: string;
+};
+
+export type VisitCoordinationResponse = {
+  events: VisitEventRow[];
+  report: VisitReportRow | null;
+  feedback: PatientVisitFeedbackRow | null;
+};
+
+export type CareCircleRecipientRow = {
+  id: string;
+  job_id: string | null;
+  display_name: string;
+  relationship: string;
+  email: string | null;
+  phone: string | null;
+  receive_milestones: boolean;
+  receive_summary: boolean;
+  consented_at: string;
+};
+
+export type CareCircleListResponse = {
+  recipients: CareCircleRecipientRow[];
+};
+
+export type PatientVisitFeedbackRow = {
+  id: string;
+  job_id: string;
+  rating: number;
+  comments: string | null;
+  would_rebook: boolean | null;
+  prefer_same_nurse: boolean;
+};
+
 export type ApiIssue = {
   path?: string;
   message: string;

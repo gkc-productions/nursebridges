@@ -96,12 +96,32 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     if (data?.user?.email) identityLabels.set(profileId, data.user.email);
   }));
 
-  const { data: auditEvents } = await supabaseAdmin
-    .from("admin_audit_logs")
-    .select("id,action,actor_id,created_at")
-    .eq("entity_type", "job")
-    .eq("entity_id", job.id)
-    .order("created_at", { ascending: true });
+  const [
+    { data: auditEvents },
+    { data: visitEvents, error: visitEventsError },
+    { data: visitReport, error: visitReportError },
+    { data: feedback, error: feedbackError },
+    { data: careCircle, error: careCircleError }
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("admin_audit_logs")
+      .select("id,action,actor_id,created_at")
+      .eq("entity_type", "job")
+      .eq("entity_id", job.id)
+      .order("created_at", { ascending: true }),
+    supabaseAdmin
+      .from("visit_events")
+      .select("id,event_type,occurred_at,patient_visible,note")
+      .eq("job_id", job.id)
+      .order("occurred_at", { ascending: true }),
+    supabaseAdmin.from("visit_reports").select("status,visit_summary,provider_instructions,follow_up_tasks,transportation_outcome,submitted_at,updated_at").eq("job_id", job.id).maybeSingle(),
+    supabaseAdmin.from("patient_visit_feedback").select("rating,comments,would_rebook,prefer_same_nurse,updated_at").eq("job_id", job.id).maybeSingle(),
+    supabaseAdmin.from("care_circle_recipients").select("id,display_name,relationship,receive_milestones,receive_summary,consented_at,revoked_at").eq("patient_user_id", job.patient_user_id).is("revoked_at", null)
+  ]);
+
+  if (visitEventsError || visitReportError || feedbackError || careCircleError) {
+    return adminJson(request, { error: "Unable to load visit operations" }, { status: 400 });
+  }
 
   const patientName = identityLabels.get(job.patient_user_id ?? "") ?? null;
   const nurseName = nurseId ? identityLabels.get(nurseId) ?? null : null;
@@ -142,7 +162,13 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       auditEvents: auditEvents ?? [],
       identityLabels,
       patientName
-    })
+    }),
+    visit: {
+      events: visitEvents ?? [],
+      report: visitReport ?? null,
+      feedback: feedback ?? null,
+      care_circle: careCircle ?? []
+    }
   });
 }
 

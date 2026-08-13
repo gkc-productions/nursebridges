@@ -62,6 +62,46 @@ type ApplicationRow = {
   created_at: string;
 };
 
+type VisitOperations = {
+  events: Array<{
+    id: string;
+    event_type: string;
+    occurred_at: string;
+    patient_visible: boolean;
+    note: string | null;
+  }>;
+  report: {
+    status: string;
+    visit_summary: string | null;
+    provider_instructions: string | null;
+    follow_up_tasks: string | null;
+    transportation_outcome: string | null;
+    submitted_at: string | null;
+  } | null;
+  feedback: {
+    rating: number;
+    comments: string | null;
+    would_rebook: boolean | null;
+    prefer_same_nurse: boolean;
+    updated_at: string;
+  } | null;
+  care_circle: Array<{
+    id: string;
+    display_name: string;
+    relationship: string;
+    receive_milestones: boolean;
+    receive_summary: boolean;
+    consented_at: string;
+  }>;
+};
+
+const emptyVisitOperations: VisitOperations = {
+  events: [],
+  report: null,
+  feedback: null,
+  care_circle: []
+};
+
 function formatDateTime(value: string | null) {
   if (!value) return "-";
   const date = new Date(value);
@@ -95,6 +135,7 @@ export default function JobDetailPage() {
   const [job, setJob] = useState<JobDetail | null>(null);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [applications, setApplications] = useState<ApplicationRow[]>([]);
+  const [visit, setVisit] = useState<VisitOperations>(emptyVisitOperations);
   const [selectedNurse, setSelectedNurse] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
@@ -116,6 +157,7 @@ export default function JobDetailPage() {
     setJob(data.job as JobDetail);
     setEvents(data.events as EventRow[]);
     setApplications((data.applications ?? []) as ApplicationRow[]);
+    setVisit((data.visit ?? emptyVisitOperations) as VisitOperations);
     setSelectedNurse("");
   };
 
@@ -215,11 +257,18 @@ export default function JobDetailPage() {
               <button
                 className="button"
                 onClick={() => updateJobStatus("completed")}
-                disabled={job.status !== "assigned"}
+                disabled={
+                  job.status !== "assigned" ||
+                  !visit.events.some((event) => event.event_type === "visit_completed") ||
+                  (visit.report?.status !== "submitted" && visit.report?.status !== "amended")
+                }
               >
                 Complete care
               </button>
             </div>
+            {job.status === "assigned" && (!visit.events.some((event) => event.event_type === "visit_completed") || !visit.report || visit.report.status === "draft") ? (
+              <p className="notice">Completion unlocks after the nurse submits the report and records the final visit checkpoint.</p>
+            ) : null}
           </article>
 
           <div className="detail-span-full logistics-grid">
@@ -259,6 +308,74 @@ export default function JobDetailPage() {
               </>
             ) : <article className="detail-panel"><p>Structured logistics have not been recorded for this legacy request.</p></article>}
           </div>
+
+          <article className="detail-panel detail-span-full">
+            <p className="label">Live operations</p>
+            <h3>Visit execution timeline</h3>
+            {visit.events.length === 0 ? (
+              <p>No visit checkpoints have been recorded.</p>
+            ) : (
+              <table>
+                <thead><tr><th>Time</th><th>Checkpoint</th><th>Patient visible</th><th>Operational note</th></tr></thead>
+                <tbody>
+                  {visit.events.map((event) => (
+                    <tr key={event.id}>
+                      <td>{formatDateTime(event.occurred_at)}</td>
+                      <td>{formatEventType(event.event_type)}</td>
+                      <td>{event.patient_visible ? "Yes" : "No"}</td>
+                      <td>{event.note ?? "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </article>
+
+          <article className="detail-panel">
+            <p className="label">Nurse documentation</p>
+            <h3>Visit report</h3>
+            {visit.report ? (
+              <dl className="detail-list compact">
+                <div><dt>Status</dt><dd>{label(visit.report.status)}</dd></div>
+                <div><dt>Visit summary</dt><dd>{visit.report.visit_summary ?? "-"}</dd></div>
+                <div><dt>Provider instructions</dt><dd>{visit.report.provider_instructions ?? "-"}</dd></div>
+                <div><dt>Follow-up tasks</dt><dd>{visit.report.follow_up_tasks ?? "-"}</dd></div>
+                <div><dt>Transportation outcome</dt><dd>{visit.report.transportation_outcome ?? "-"}</dd></div>
+                <div><dt>Submitted</dt><dd>{formatDateTime(visit.report.submitted_at)}</dd></div>
+              </dl>
+            ) : <p>No report has been started.</p>}
+          </article>
+
+          <article className="detail-panel">
+            <p className="label">Patient experience</p>
+            <h3>Feedback and rebooking</h3>
+            {visit.feedback ? (
+              <dl className="detail-list compact">
+                <div><dt>Rating</dt><dd>{visit.feedback.rating} / 5</dd></div>
+                <div><dt>Would rebook</dt><dd>{visit.feedback.would_rebook === null ? "Not answered" : visit.feedback.would_rebook ? "Yes" : "No"}</dd></div>
+                <div><dt>Same nurse preferred</dt><dd>{visit.feedback.prefer_same_nurse ? "Yes" : "No"}</dd></div>
+                <div><dt>Private feedback</dt><dd>{visit.feedback.comments ?? "-"}</dd></div>
+              </dl>
+            ) : <p>No patient feedback has been submitted.</p>}
+          </article>
+
+          <article className="detail-panel detail-span-full">
+            <p className="label">Consent registry</p>
+            <h3>Care circle</h3>
+            {visit.care_circle.length === 0 ? <p>No active care-circle consent is recorded.</p> : (
+              <table>
+                <thead><tr><th>Recipient</th><th>Relationship</th><th>Authorized updates</th><th>Consented</th></tr></thead>
+                <tbody>{visit.care_circle.map((recipient) => (
+                  <tr key={recipient.id}>
+                    <td>{recipient.display_name}</td>
+                    <td>{recipient.relationship}</td>
+                    <td>{[recipient.receive_milestones ? "Milestones" : null, recipient.receive_summary ? "Summary" : null].filter(Boolean).join(" and ")}</td>
+                    <td>{formatDateTime(recipient.consented_at)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            )}
+          </article>
 
           <article className="detail-panel detail-span-full">
             <h3>Applicants</h3>

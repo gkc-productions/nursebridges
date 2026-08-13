@@ -11,7 +11,7 @@ export default {
     orientation: "portrait",
     icon: "./assets/icon-light.png",
     userInterfaceStyle: "light",
-    plugins: ["expo-secure-store"],
+    plugins: ["expo-secure-store", "expo-font"],
     splash: {
       image: "./assets/splash.png",
       resizeMode: "contain",
