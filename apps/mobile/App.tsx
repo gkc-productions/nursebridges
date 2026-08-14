@@ -524,7 +524,10 @@ function PatientVisitOutcomePanel({
   onComments,
   onWouldRebook,
   onPreferSameNurse,
-  onSubmit
+  onSubmit,
+  recurringCadence,
+  onRecurringCadence,
+  onRequestRecurring
 }: {
   report: VisitReportRow | null;
   feedback: PatientVisitFeedbackRow | null;
@@ -538,6 +541,9 @@ function PatientVisitOutcomePanel({
   onWouldRebook: (value: boolean) => void;
   onPreferSameNurse: (value: boolean) => void;
   onSubmit: () => void;
+  recurringCadence: "weekly" | "biweekly" | "monthly";
+  onRecurringCadence: (value: "weekly" | "biweekly" | "monthly") => void;
+  onRequestRecurring: () => void;
 }) {
   return (
     <View style={styles.card}>
@@ -571,6 +577,12 @@ function PatientVisitOutcomePanel({
         <Text style={styles.buttonText}>{feedback ? "Update feedback" : "Submit feedback"}</Text>
       </TouchableOpacity>
       <Text style={styles.formPrivacyNote}>Your feedback and rebooking preference are visible to NurseBridges administrators, not the nurse.</Text>
+      <Text style={styles.supportTitle}>Need this support again?</Text>
+      <ChoiceGroup value={recurringCadence} options={[{ value: "weekly", label: "Weekly" }, { value: "biweekly", label: "Every 2 weeks" }, { value: "monthly", label: "Monthly" }]} onChange={(value) => onRecurringCadence(value as "weekly" | "biweekly" | "monthly")} />
+      <TouchableOpacity style={styles.secondaryButton} onPress={onRequestRecurring} disabled={actionLoading}>
+        <Text style={styles.secondaryButtonText}>Request recurring care review</Text>
+      </TouchableOpacity>
+      <Text style={styles.formPrivacyNote}>Each future visit is reviewed by the care team. This does not schedule, charge, or automatically assign a nurse.</Text>
     </View>
   );
 }
@@ -1159,6 +1171,8 @@ export default function App({ product = "patient" }: { product?: MobileProductId
   const [feedbackComments, setFeedbackComments] = useState("");
   const [feedbackWouldRebook, setFeedbackWouldRebook] = useState<boolean | null>(null);
   const [feedbackPreferSameNurse, setFeedbackPreferSameNurse] = useState(false);
+  const [recurringCadence, setRecurringCadence] = useState<"weekly" | "biweekly" | "monthly">("weekly");
+  const [arrivalPin, setArrivalPin] = useState<string | null>(null);
   const [careCircleRecipients, setCareCircleRecipients] = useState<CareCircleRecipientRow[]>([]);
   const [careCircleName, setCareCircleName] = useState("");
   const [careCircleRelationship, setCareCircleRelationship] = useState("");
@@ -2067,10 +2081,63 @@ export default function App({ product = "patient" }: { product?: MobileProductId
           prefer_same_nurse: feedbackPreferSameNurse
         })
       });
+      if (feedbackPreferSameNurse && job.assigned_nurse_user_id) {
+        await apiFetch(baseUrl, session, "/marketplace/preferences", {
+          method: "PUT",
+          body: JSON.stringify({
+            nurse_user_id: job.assigned_nurse_user_id,
+            source_job_id: job.id,
+            status: "preferred"
+          })
+        });
+      }
       setNotice("Thank you. Your private feedback was saved.");
       await loadVisitCoordination(job.id);
     } catch (err) {
       setError(formatApiErrorMessage("Unable to save feedback.", err));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function createPatientArrivalPin(job: JobRow) {
+    if (!session || role !== "patient") return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      const data = await apiFetch<{ pin: string }>(baseUrl, session, `/jobs/${job.id}/arrival-pin`, { method: "POST" });
+      setArrivalPin(data.pin);
+      setNotice("Arrival PIN created. Share it with the assigned nurse in person.");
+    } catch (err) {
+      setError(formatApiErrorMessage("Unable to create the arrival PIN.", err));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function requestRecurringCare(job: JobRow) {
+    if (!session || role !== "patient") return;
+    const source = job.start_time ? new Date(job.start_time) : new Date();
+    const starts = new Date(source.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const localTime = `${starts.getHours().toString().padStart(2, "0")}:${starts.getMinutes().toString().padStart(2, "0")}:00`;
+    const startsOn = `${starts.getFullYear()}-${(starts.getMonth() + 1).toString().padStart(2, "0")}-${starts.getDate().toString().padStart(2, "0")}`;
+    setActionLoading(true);
+    setError(null);
+    try {
+      await apiFetch(baseUrl, session, "/marketplace/recurring-care", {
+        method: "POST",
+        body: JSON.stringify({
+          source_job_id: job.id,
+          preferred_nurse_user_id: feedbackPreferSameNurse ? job.assigned_nurse_user_id ?? undefined : undefined,
+          cadence: recurringCadence,
+          starts_on: startsOn,
+          local_time: localTime,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        })
+      });
+      setNotice("Recurring care request sent for coordinator review.");
+    } catch (err) {
+      setError(formatApiErrorMessage("Unable to request recurring care.", err));
     } finally {
       setActionLoading(false);
     }
@@ -2594,6 +2661,11 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                     <FieldRow label="Transportation" value={patientFocusJob.logistics?.transportation_mode?.replaceAll("_", " ")} />
                     <FieldRow label="Pre-visit plan" value={visitEvents.some((event) => event.event_type === "pre_visit_confirmed") ? "Confirmed" : "Waiting for nurse confirmation"} />
                     <Text style={styles.formPrivacyNote}>Use Messages for practical coordination. Do not send diagnoses, account numbers, access codes, or emergency requests.</Text>
+                    <Text style={styles.supportTitle}>In-person arrival confirmation</Text>
+                    {arrivalPin ? <View style={styles.supportPanel}><Text style={styles.eyebrow}>ARRIVAL PIN</Text><Text style={styles.metricValue}>{arrivalPin}</Text><Text style={styles.formPrivacyNote}>Show or tell this six-digit PIN to the assigned nurse only after you meet in person.</Text></View> : null}
+                    <TouchableOpacity style={styles.secondaryButton} onPress={() => void createPatientArrivalPin(patientFocusJob)} disabled={actionLoading}>
+                      <Text style={styles.secondaryButtonText}>{arrivalPin ? "Replace arrival PIN" : "Create arrival PIN"}</Text>
+                    </TouchableOpacity>
                   </View>
                 ) : null}
                 {patientFocusJob?.status === "assigned" ? <PatientVisitProgressPanel events={visitEvents} /> : null}
@@ -2611,6 +2683,9 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                     onWouldRebook={setFeedbackWouldRebook}
                     onPreferSameNurse={setFeedbackPreferSameNurse}
                     onSubmit={() => void submitPatientFeedback(patientFocusJob)}
+                    recurringCadence={recurringCadence}
+                    onRecurringCadence={setRecurringCadence}
+                    onRequestRecurring={() => void requestRecurringCare(patientFocusJob)}
                   />
                 ) : null}
                 {patientFocusJob ? (
