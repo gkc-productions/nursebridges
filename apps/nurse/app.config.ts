@@ -7,7 +7,7 @@ export default {
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
-    plugins: ["expo-secure-store"],
+    plugins: ["expo-secure-store", "expo-font"],
     splash: {
       image: "./assets/brand/nursebridges-care-mark.png",
       resizeMode: "contain",

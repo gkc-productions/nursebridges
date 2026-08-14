@@ -1,10 +1,5 @@
 import "react-native-url-polyfill/auto";
-import React from "react";
 import { registerRootComponent } from "expo";
-import App from "../mobile/App";
+import App from "./App";
 
-function NurseBridgesCareApp() {
-  return React.createElement(App, { product: "nurse" });
-}
-
-registerRootComponent(NurseBridgesCareApp);
+registerRootComponent(App);
