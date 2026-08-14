@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { fetchAdminMe, signInWithPassword } from "../../lib/adminAuthClient";
+import { fetchAdminMe, restoreAdminAccessToken, signInWithPassword } from "../../lib/adminAuthClient";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,6 +10,30 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const restoreMagicLinkSession = async () => {
+      try {
+        const token = await restoreAdminAccessToken();
+        if (!token || !active) return;
+
+        setLoading(true);
+        await fetchAdminMe();
+        if (active) router.replace("/");
+      } catch {
+        // A missing or invalid callback session should leave the password form available.
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void restoreMagicLinkSession();
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   const handleLogin = async () => {
     setLoading(true);

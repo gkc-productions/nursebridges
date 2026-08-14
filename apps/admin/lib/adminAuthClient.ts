@@ -32,6 +32,15 @@ export function getAdminAccessToken(): string | null {
   return t ? cleanToken(t) : null;
 }
 
+export async function restoreAdminAccessToken(): Promise<string | null> {
+  const { data, error } = await getSupabaseClient().auth.getSession();
+  if (error) throw error;
+
+  const token = data.session?.access_token ?? null;
+  setAdminAccessToken(token);
+  return token;
+}
+
 export async function signOutAdmin() {
   setAdminAccessToken(null);
   await getSupabaseClient().auth.signOut();
@@ -55,6 +64,9 @@ export async function adminFetch(path: string, init: RequestInit = {}) {
 
   if (res.status === 401 || res.status === 403) {
     await signOutAdmin();
+    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      window.location.assign("/login");
+    }
     throw new Error("Admin session expired");
   }
 
