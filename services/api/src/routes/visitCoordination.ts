@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { requireAuth, requireRole } from "../auth.js";
 import { canRecordVisitEvent, canSubmitPatientFeedback, canSubmitVisitReport, type VisitEventType } from "../jobWorkflow.js";
 import { supabaseForUser } from "../supabase.js";
+import { supabaseAdmin } from "../supabase.js";
+import { patientRatingSignal } from "../qualitySignals.js";
 import { careCircleRecipientSchema, patientFeedbackSchema, visitEventSchema, visitReportSchema } from "../validators.js";
 
 export async function visitCoordinationRoutes(app: FastifyInstance) {
@@ -141,6 +143,43 @@ export async function visitCoordinationRoutes(app: FastifyInstance) {
     if (!canSubmitPatientFeedback({ jobStatus: job.status, rating: body.rating })) return reply.code(409).send({ error: "Feedback is available after completion" });
     const { data, error } = await sb.from("patient_visit_feedback").upsert({ ...body, job_id: jobId, patient_user_id: authed.userId }, { onConflict: "job_id" }).select("*").single();
     if (error) return reply.code(400).send({ error: "Unable to save feedback" });
+    if (supabaseAdmin) {
+      const quality = patientRatingSignal(body.rating);
+      const { data: assignment } = await supabaseAdmin.from("jobs").select("assigned_nurse_user_id").eq("id", jobId).maybeSingle();
+      await supabaseAdmin.from("marketplace_quality_signals").insert({
+        job_id: jobId,
+        nurse_user_id: assignment?.assigned_nurse_user_id ?? null,
+        patient_user_id: authed.userId,
+        signal_type: quality.signalType,
+        severity: quality.severity,
+        value_numeric: body.rating,
+        metadata: { would_rebook: body.would_rebook ?? null, prefer_same_nurse: body.prefer_same_nurse }
+      });
+      if (body.prefer_same_nurse && assignment?.assigned_nurse_user_id) {
+        await supabaseAdmin.from("preferred_nurses").upsert({
+          patient_user_id: authed.userId,
+          nurse_user_id: assignment.assigned_nurse_user_id,
+          source_job_id: jobId,
+          status: "preferred"
+        }, { onConflict: "patient_user_id,nurse_user_id" });
+      }
+      if (quality.needsServiceRecovery) {
+        const { data: existingCase } = await supabaseAdmin.from("operations_cases").select("id")
+          .eq("case_type", "service_recovery").eq("subject_id", jobId).not("status", "in", "(resolved,closed)").limit(1).maybeSingle();
+        if (!existingCase) {
+          await supabaseAdmin.from("operations_cases").insert({
+            case_type: "service_recovery",
+            subject_type: "job",
+            subject_id: jobId,
+            title: "Low patient experience rating requires follow-up",
+            description: "Review the private feedback, contact the patient through an approved channel, and document the recovery outcome.",
+            priority: "high",
+            reported_by_user_id: authed.userId,
+            due_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+          });
+        }
+      }
+    }
     return reply.send({ feedback: data });
   });
 }

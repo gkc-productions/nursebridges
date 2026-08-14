@@ -164,3 +164,59 @@ export const jobMessageSchema = z.object({
   body: z.string().trim().min(1).max(2000),
   client_message_id: z.string().uuid().optional()
 });
+
+export const nurseWorkspaceProfileSchema = z.object({
+  professional_summary: optionalTrimmedString(1200),
+  years_experience: z.number().int().min(0).max(70).optional(),
+  service_radius_miles: z.number().int().min(1).max(250).optional(),
+  availability_status: z.enum(["available", "limited", "unavailable"]),
+  onboarding_step: z.enum(["profile", "credentials", "availability", "review", "complete"])
+});
+
+export const nurseAvailabilitySchema = z.object({
+  windows: z.array(z.object({
+    starts_at: z.string().datetime(),
+    ends_at: z.string().datetime(),
+    timezone: z.string().trim().min(1).max(80).default("America/New_York"),
+    recurrence: z.enum(["none", "weekly"]).default("none")
+  }).superRefine((value, context) => {
+    const startsAt = new Date(value.starts_at).getTime();
+    const endsAt = new Date(value.ends_at).getTime();
+    if (endsAt <= startsAt) context.addIssue({ code: "custom", path: ["ends_at"], message: "End time must be after start time." });
+    if (endsAt - startsAt > 31 * 24 * 60 * 60 * 1000) context.addIssue({ code: "custom", path: ["ends_at"], message: "Availability windows cannot exceed 31 days." });
+  })).max(50)
+});
+
+export const supportCaseSchema = z.object({
+  case_type: z.enum(["support", "incident"]),
+  subject_type: z.enum(["job", "account", "credential"]),
+  subject_id: z.string().uuid().optional(),
+  title: z.string().trim().min(3).max(180),
+  description: optionalTrimmedString(4000),
+  priority: z.enum(["normal", "high", "urgent"]).default("normal")
+});
+
+export const preferredNurseSchema = z.object({
+  nurse_user_id: z.string().uuid(),
+  source_job_id: z.string().uuid().optional(),
+  status: z.enum(["preferred", "do_not_match", "inactive"]).default("preferred")
+});
+
+export const recurringCarePlanSchema = z.object({
+  source_job_id: z.string().uuid().optional(),
+  preferred_nurse_user_id: z.string().uuid().optional(),
+  cadence: z.enum(["weekly", "biweekly", "monthly"]),
+  starts_on: z.string().date(),
+  ends_on: z.string().date().optional(),
+  local_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/),
+  timezone: z.string().trim().min(1).max(80).default("America/New_York"),
+  occurrences_limit: z.number().int().min(1).max(52).optional()
+}).superRefine((value, context) => {
+  if (value.ends_on && value.ends_on < value.starts_on) {
+    context.addIssue({ code: "custom", path: ["ends_on"], message: "End date must be on or after the start date." });
+  }
+});
+
+export const arrivalPinSchema = z.object({
+  pin: z.string().regex(/^\d{6}$/, "Enter the six-digit arrival PIN.")
+});
