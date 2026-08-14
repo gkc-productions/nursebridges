@@ -41,6 +41,15 @@ export async function restoreAdminAccessToken(): Promise<string | null> {
   return token;
 }
 
+export async function signInWithMagicLinkToken(tokenHash: string) {
+  const result = await getSupabaseClient().auth.verifyOtp({
+    token_hash: tokenHash,
+    type: "magiclink"
+  });
+  setAdminAccessToken(result.data.session?.access_token ?? null);
+  return result;
+}
+
 export async function signOutAdmin() {
   setAdminAccessToken(null);
   await getSupabaseClient().auth.signOut();
