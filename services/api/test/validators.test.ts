@@ -4,6 +4,7 @@ import { ZodError } from "zod";
 import {
   careCircleRecipientSchema,
   createJobSchema,
+  jobMessageSchema,
   patientFeedbackSchema,
   visitEventSchema,
   visitReportSchema
@@ -160,5 +161,22 @@ describe("visit coordination schemas", () => {
     });
     assert.equal(recipient.receive_milestones, true);
     assert.equal(recipient.receive_summary, false);
+  });
+});
+
+describe("jobMessageSchema", () => {
+  it("trims request-specific messages and accepts an idempotency key", () => {
+    assert.deepEqual(jobMessageSchema.parse({
+      body: "  I will meet the nurse in the lobby.  ",
+      client_message_id: "91a62fb2-d6ce-44a4-bf1c-1fa0244af3e3"
+    }), {
+      body: "I will meet the nurse in the lobby.",
+      client_message_id: "91a62fb2-d6ce-44a4-bf1c-1fa0244af3e3"
+    });
+  });
+
+  it("rejects blank and oversized messages", () => {
+    assert.throws(() => jobMessageSchema.parse({ body: "   " }), ZodError);
+    assert.throws(() => jobMessageSchema.parse({ body: "x".repeat(2001) }), ZodError);
   });
 });

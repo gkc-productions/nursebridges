@@ -46,12 +46,16 @@ import type {
   ApplicationRow,
   CareCircleListResponse,
   CareCircleRecipientRow,
+  JobMessageListResponse,
+  JobMessageRow,
   JobListResponse,
   JobRow,
   NotificationListResponse,
   NotificationRow,
   NurseProfile,
   PatientVisitFeedbackRow,
+  TrustedNurse,
+  TrustedNurseResponse,
   UserRole,
   VisitCoordinationResponse,
   VisitEventRow,
@@ -758,10 +762,10 @@ function PatientTabBar({
 }) {
   const tabs: Array<{ key: PatientTab; label: string; icon: React.ComponentProps<typeof Ionicons>["name"] }> = [
     { key: "home", label: "Home", icon: "home-outline" },
-    { key: "new", label: "Request", icon: "add-circle-outline" },
+    { key: "new", label: "Care", icon: "add-circle-outline" },
+    { key: "updates", label: "Messages", icon: "chatbubble-ellipses-outline" },
     { key: "records", label: "Activity", icon: "receipt-outline" },
-    { key: "updates", label: "Updates", icon: "notifications-outline" },
-    { key: "account", label: "Profile", icon: "person-circle-outline" }
+    { key: "account", label: "Account", icon: "person-circle-outline" }
   ];
 
   return (
@@ -1159,6 +1163,9 @@ export default function App({ product = "patient" }: { product?: MobileProductId
   const [careCircleName, setCareCircleName] = useState("");
   const [careCircleRelationship, setCareCircleRelationship] = useState("");
   const [careCircleEmail, setCareCircleEmail] = useState("");
+  const [jobMessages, setJobMessages] = useState<JobMessageRow[]>([]);
+  const [messageDraft, setMessageDraft] = useState("");
+  const [trustedNurse, setTrustedNurse] = useState<TrustedNurse | null>(null);
 
   const [jobForm, setJobForm] = useState(emptyJobForm);
   const [verificationDocumentType, setVerificationDocumentType] = useState("license");
@@ -1512,6 +1519,22 @@ export default function App({ product = "patient" }: { product?: MobileProductId
   }, [baseUrl, patientTab, role, session?.user.id]);
 
   useEffect(() => {
+    if (role !== "patient" || !session || !baseUrl || !patientFocusJob) {
+      setJobMessages([]);
+      return;
+    }
+    if (patientTab === "updates") void loadJobMessages(patientFocusJob.id);
+  }, [baseUrl, patientFocusJob?.id, patientTab, role, session?.user.id]);
+
+  useEffect(() => {
+    if (role !== "patient" || !session || !baseUrl || patientFocusJob?.status !== "assigned") {
+      setTrustedNurse(null);
+      return;
+    }
+    void loadTrustedNurse(patientFocusJob.id);
+  }, [baseUrl, patientFocusJob?.id, patientFocusJob?.status, role, session?.user.id]);
+
+  useEffect(() => {
     if (!session || !baseUrl) return;
     void registerForPushNotificationsAsync(session, baseUrl);
   }, [baseUrl, session]);
@@ -1630,6 +1653,46 @@ export default function App({ product = "patient" }: { product?: MobileProductId
     }
   }
 
+  async function loadJobMessages(jobId: string) {
+    if (!session) return;
+    try {
+      const data = await apiFetch<JobMessageListResponse>(baseUrl, session, `/jobs/${jobId}/messages`);
+      setJobMessages(data.messages ?? []);
+    } catch (err) {
+      setError(formatApiErrorMessage("Unable to load request messages.", err));
+    }
+  }
+
+  async function sendJobMessage(jobId: string) {
+    if (!session || !messageDraft.trim()) return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      await apiFetch(baseUrl, session, `/jobs/${jobId}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ body: messageDraft })
+      });
+      setMessageDraft("");
+      setNotice("Message sent to this request.");
+      await loadJobMessages(jobId);
+    } catch (err) {
+      setError(formatApiErrorMessage("Unable to send this message.", err));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function loadTrustedNurse(jobId: string) {
+    if (!session) return;
+    try {
+      const data = await apiFetch<TrustedNurseResponse>(baseUrl, session, `/jobs/${jobId}/trusted-nurse`);
+      setTrustedNurse(data.nurse ?? null);
+    } catch (err) {
+      setTrustedNurse(null);
+      setError(formatApiErrorMessage("Unable to load the assigned nurse profile.", err));
+    }
+  }
+
   async function addCareCircleRecipient() {
     if (!session || role !== "patient") return;
     if (!careCircleName.trim() || !careCircleRelationship.trim() || !careCircleEmail.trim()) {
@@ -1645,6 +1708,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
           display_name: careCircleName,
           relationship: careCircleRelationship,
           email: careCircleEmail,
+          job_id: patientFocusJob?.id,
           receive_milestones: true,
           receive_summary: true
         })
@@ -1652,7 +1716,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
       setCareCircleName("");
       setCareCircleRelationship("");
       setCareCircleEmail("");
-      setNotice("Care-circle consent saved.");
+      setNotice("Care-circle invitation saved. No updates are shared until the recipient accepts.");
       await loadCareCircle();
     } catch (err) {
       setError(formatApiErrorMessage("Unable to add this care-circle recipient.", err));
@@ -2511,6 +2575,26 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                     onCancel={() => confirmJobTransition(patientFocusJob, "cancel")}
                   />
                 ) : null}
+                {patientFocusJob?.status === "assigned" ? (
+                  <View style={styles.card}>
+                    <SectionHeader eyebrow="Your care team" title={trustedNurse?.display_name ?? "Assigned nurse"} />
+                    {trustedNurse ? (
+                      <>
+                        <Text style={styles.notice}>NurseBridges verification approved</Text>
+                        <FieldRow label="Specialty" value={trustedNurse.specialty} />
+                        <FieldRow label="Experience" value={trustedNurse.years_experience == null ? null : `${trustedNurse.years_experience} years`} />
+                        <FieldRow label="License state" value={trustedNurse.license_state} />
+                        {trustedNurse.bio ? <Text style={styles.sectionIntro}>{trustedNurse.bio}</Text> : null}
+                      </>
+                    ) : <Text style={styles.emptyText}>The assigned nurse profile is being prepared.</Text>}
+                    <Text style={styles.supportTitle}>Before the visit</Text>
+                    <FieldRow label="Appointment" value={formatDate(patientFocusJob.start_time)} />
+                    <FieldRow label="Meeting point" value={patientFocusJob.logistics?.meeting_point} />
+                    <FieldRow label="Transportation" value={patientFocusJob.logistics?.transportation_mode?.replaceAll("_", " ")} />
+                    <FieldRow label="Pre-visit plan" value={visitEvents.some((event) => event.event_type === "pre_visit_confirmed") ? "Confirmed" : "Waiting for nurse confirmation"} />
+                    <Text style={styles.formPrivacyNote}>Use Messages for practical coordination. Do not send diagnoses, account numbers, access codes, or emergency requests.</Text>
+                  </View>
+                ) : null}
                 {patientFocusJob?.status === "assigned" ? <PatientVisitProgressPanel events={visitEvents} /> : null}
                 {patientFocusJob?.status === "completed" ? (
                   <PatientVisitOutcomePanel
@@ -2595,9 +2679,49 @@ export default function App({ product = "patient" }: { product?: MobileProductId
             ) : null}
 
             {role === "admin" || (role === "patient" && patientTab === "updates") || (role === "nurse" && nurseTab === "inbox") ? (
+              <>
+              {role === "patient" && patientTab === "updates" ? (
+                <View style={styles.card}>
+                  <SectionHeader
+                    eyebrow="Private coordination"
+                    title={patientFocusJob ? patientFocusJob.title : "Request messages"}
+                    actionLabel={patientFocusJob ? "Refresh" : undefined}
+                    onAction={patientFocusJob ? () => loadJobMessages(patientFocusJob.id) : undefined}
+                    disabled={screenLoading || actionLoading}
+                  />
+                  {!patientFocusJob ? <Text style={styles.emptyText}>Create a care request before starting a message thread.</Text> : (
+                    <>
+                      {jobMessages.length === 0 ? <Text style={styles.emptyText}>No messages yet. Use this thread for visit coordination.</Text> : jobMessages.map((message) => (
+                        <View key={message.id} style={styles.jobCard}>
+                          <View style={styles.rowBetween}>
+                            <Text style={styles.jobTitle}>{message.sender_label}</Text>
+                            <Text style={styles.meta}>{formatDate(message.created_at)}</Text>
+                          </View>
+                          <Text style={styles.sectionIntro}>{message.body}</Text>
+                        </View>
+                      ))}
+                      <Text style={styles.inputLabel}>Message about this request</Text>
+                      <TextInput
+                        accessibilityLabel="Message about this care request"
+                        style={[styles.input, styles.multilineInput]}
+                        value={messageDraft}
+                        onChangeText={setMessageDraft}
+                        placeholder="Share a practical arrival, timing, or coordination update"
+                        placeholderTextColor={colors.mutedSoft}
+                        multiline
+                        maxLength={2000}
+                      />
+                      <TouchableOpacity style={styles.button} onPress={() => void sendJobMessage(patientFocusJob.id)} disabled={actionLoading || !messageDraft.trim()}>
+                        <Text style={styles.buttonText}>Send message</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.formPrivacyNote}>Not monitored for emergencies. Do not include medical history, payment information, or building access codes.</Text>
+                    </>
+                  )}
+                </View>
+              ) : null}
               <View style={styles.card}>
                 <SectionHeader
-                  eyebrow="Updates"
+                  eyebrow={role === "patient" ? "Request alerts" : "Updates"}
                   title={`Notifications (${unreadNotificationCount})`}
                   actionLabel="Refresh"
                   onAction={loadNotifications}
@@ -2634,6 +2758,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                   ))
                 )}
               </View>
+              </>
             ) : null}
 
             {role === "patient" ? (
@@ -2657,12 +2782,15 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                           <Text style={styles.jobTitle}>{recipient.display_name}</Text>
                           <FieldRow label="Relationship" value={recipient.relationship} />
                           <FieldRow label="Updates" value={[recipient.receive_milestones ? "Milestones" : null, recipient.receive_summary ? "Summary" : null].filter(Boolean).join(" and ")} />
+                          <FieldRow label="Invitation" value={recipient.invitation_status} />
+                          <FieldRow label="Delivery" value={recipient.delivery_status.replaceAll("_", " ")} />
+                          {recipient.invitation_status === "pending" ? <FieldRow label="Expires" value={formatDate(recipient.invitation_expires_at)} /> : null}
                           <TouchableOpacity style={styles.detailSecondaryAction} onPress={() => void revokeCareCircleRecipient(recipient.id)} disabled={actionLoading}>
                             <Text style={styles.detailSecondaryActionText}>Revoke access</Text>
                           </TouchableOpacity>
                         </View>
                       ))}
-                      <Text style={styles.formPrivacyNote}>This records consent; automatic email or text delivery will be enabled only after the notification service is verified.</Text>
+                      <Text style={styles.formPrivacyNote}>This records your consent and a request-specific invitation. No updates are shared until secure delivery and recipient acceptance are enabled.</Text>
                     </View>
                     <AccountPanel
                       email={session.user.email}

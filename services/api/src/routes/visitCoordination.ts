@@ -9,9 +9,21 @@ export async function visitCoordinationRoutes(app: FastifyInstance) {
     const authed = await requireAuth(req);
     requireRole(authed, ["patient"]);
     const sb = supabaseForUser(authed.jwt);
-    const { data, error } = await sb.from("care_circle_recipients").select("*").eq("patient_user_id", authed.userId).is("revoked_at", null).order("created_at");
+    const { data, error } = await sb.from("care_circle_recipients")
+      .select("id,job_id,display_name,relationship,email,phone,receive_milestones,receive_summary,consented_at,invitation_status,invitation_expires_at,accepted_at,last_invited_at,delivery_status")
+      .eq("patient_user_id", authed.userId)
+      .is("revoked_at", null)
+      .order("created_at");
     if (error) return reply.code(400).send({ error: "Unable to load care circle" });
-    return reply.send({ recipients: data ?? [] });
+    const now = Date.now();
+    return reply.send({
+      recipients: (data ?? []).map((recipient) => ({
+        ...recipient,
+        invitation_status: recipient.invitation_status === "pending" && new Date(recipient.invitation_expires_at).getTime() <= now
+          ? "expired"
+          : recipient.invitation_status
+      }))
+    });
   });
 
   app.post("/care-circle", async (req, reply) => {
@@ -19,9 +31,23 @@ export async function visitCoordinationRoutes(app: FastifyInstance) {
     requireRole(authed, ["patient"]);
     const body = careCircleRecipientSchema.parse(req.body ?? {});
     const sb = supabaseForUser(authed.jwt);
-    const { data, error } = await sb.from("care_circle_recipients").insert({ ...body, patient_user_id: authed.userId }).select("*").single();
+    const now = new Date();
+    const { data, error } = await sb.from("care_circle_recipients").insert({
+      ...body,
+      patient_user_id: authed.userId,
+      invitation_status: "pending",
+      invitation_expires_at: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      last_invited_at: now.toISOString(),
+      delivery_status: "not_sent"
+    }).select("id,job_id,display_name,relationship,email,phone,receive_milestones,receive_summary,consented_at,invitation_status,invitation_expires_at,accepted_at,last_invited_at,delivery_status").single();
     if (error) return reply.code(400).send({ error: "Unable to add care-circle recipient" });
-    return reply.code(201).send({ recipient: data });
+    return reply.code(201).send({
+      recipient: data,
+      delivery: {
+        status: "not_sent",
+        detail: "Consent is saved. The invitation will not share updates until delivery and acceptance are enabled."
+      }
+    });
   });
 
   app.delete("/care-circle/:recipientId", async (req, reply) => {
@@ -29,8 +55,14 @@ export async function visitCoordinationRoutes(app: FastifyInstance) {
     requireRole(authed, ["patient"]);
     const { recipientId } = req.params as { recipientId: string };
     const sb = supabaseForUser(authed.jwt);
-    const { error } = await sb.from("care_circle_recipients").update({ revoked_at: new Date().toISOString() }).eq("id", recipientId).eq("patient_user_id", authed.userId);
+    const { data, error } = await sb.from("care_circle_recipients")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("id", recipientId)
+      .eq("patient_user_id", authed.userId)
+      .select("id")
+      .maybeSingle();
     if (error) return reply.code(400).send({ error: "Unable to revoke recipient" });
+    if (!data) return reply.code(404).send({ error: "Care-circle recipient not found" });
     return reply.code(204).send();
   });
 

@@ -150,10 +150,43 @@ export type CareCircleRecipientRow = {
   receive_milestones: boolean;
   receive_summary: boolean;
   consented_at: string;
+  invitation_status: "pending" | "accepted" | "expired" | "revoked";
+  invitation_expires_at: string;
+  accepted_at: string | null;
+  last_invited_at: string | null;
+  delivery_status: "not_sent" | "queued" | "sent" | "failed";
 };
 
 export type CareCircleListResponse = {
   recipients: CareCircleRecipientRow[];
+};
+
+export type JobMessageRow = {
+  id: string;
+  job_id: string;
+  sender_user_id: string;
+  sender_label: string;
+  body: string;
+  created_at: string;
+};
+
+export type JobMessageListResponse = {
+  messages: JobMessageRow[];
+};
+
+export type TrustedNurse = {
+  id: string;
+  display_name: string;
+  specialty: string | null;
+  years_experience: number | null;
+  bio: string | null;
+  license_state: string | null;
+  verification_status: "approved";
+  verified_at: string | null;
+};
+
+export type TrustedNurseResponse = {
+  nurse: TrustedNurse | null;
 };
 
 export type PatientVisitFeedbackRow = {

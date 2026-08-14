@@ -159,3 +159,8 @@ export const careCircleRecipientSchema = z.object({
   if (!value.email && !value.phone) context.addIssue({ code: "custom", path: ["email"], message: "Provide an email or phone number." });
   if (!value.receive_milestones && !value.receive_summary) context.addIssue({ code: "custom", path: ["receive_milestones"], message: "Select at least one update category." });
 });
+
+export const jobMessageSchema = z.object({
+  body: z.string().trim().min(1).max(2000),
+  client_message_id: z.string().uuid().optional()
+});

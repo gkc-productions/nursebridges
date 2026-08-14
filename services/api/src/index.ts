@@ -12,6 +12,7 @@ import { pushRoutes } from "./routes/push.js";
 import { nurseRoutes } from "./routes/nurse.js";
 import { registerPatientAccessRequestRoute } from "./routes/patientAccessRequestRoute.js";
 import { visitCoordinationRoutes } from "./routes/visitCoordination.js";
+import { patientJourneyRoutes } from "./routes/patientJourney.js";
 import { supabaseAdmin } from "./supabase.js";
 
 const requestStartTimes = new WeakMap<object, number>();
@@ -72,6 +73,7 @@ async function main() {
   await pushRoutes(app);
   await nurseRoutes(app);
   await visitCoordinationRoutes(app);
+  await patientJourneyRoutes(app);
   await adminRoutes(app);
 
   // Error handler (consistent responses)
