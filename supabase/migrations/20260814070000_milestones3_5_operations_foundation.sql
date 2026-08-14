@@ -225,7 +225,7 @@ language plpgsql security definer set search_path = public
 as $$
 declare updated_case public.operations_cases;
 begin
-  if not public.is_admin() then raise exception 'forbidden' using errcode = '42501'; end if;
+  if not app_private.is_admin() then raise exception 'forbidden' using errcode = '42501'; end if;
   update public.operations_cases set
     owner_user_id = p_owner_user_id,
     status = p_status,
@@ -266,34 +266,34 @@ grant select, insert, update, delete on public.operations_case_presence to authe
 grant select on public.care_quotes, public.nurse_earning_records to authenticated;
 
 create policy nurse_availability_owner on public.nurse_availability_windows for all to authenticated
-  using ((select auth.uid()) = nurse_user_id or public.is_admin())
-  with check ((select auth.uid()) = nurse_user_id or public.is_admin());
+  using ((select auth.uid()) = nurse_user_id or app_private.is_admin())
+  with check ((select auth.uid()) = nurse_user_id or app_private.is_admin());
 create policy operations_cases_admin_all on public.operations_cases for all to authenticated
-  using (public.is_admin()) with check (public.is_admin());
+  using (app_private.is_admin()) with check (app_private.is_admin());
 create policy admin_team_members_admin_select on public.admin_team_members for select to authenticated
-  using (public.is_admin());
+  using (app_private.is_admin());
 create policy operations_cases_reporter_select on public.operations_cases for select to authenticated
   using ((select auth.uid()) = reported_by_user_id);
 create policy operations_cases_reporter_insert on public.operations_cases for insert to authenticated
   with check ((select auth.uid()) = reported_by_user_id and case_type in ('support','incident'));
 create policy operations_notes_admin_all on public.operations_case_notes for all to authenticated
-  using (public.is_admin()) with check (public.is_admin());
+  using (app_private.is_admin()) with check (app_private.is_admin());
 create policy operations_notes_reporter_select on public.operations_case_notes for select to authenticated
   using (visibility = 'reporter' and exists (
     select 1 from public.operations_cases c where c.id = case_id and c.reported_by_user_id = (select auth.uid())
   ));
 create policy operations_presence_admin_all on public.operations_case_presence for all to authenticated
-  using (public.is_admin()) with check (public.is_admin() and admin_user_id = (select auth.uid()));
+  using (app_private.is_admin()) with check (app_private.is_admin() and admin_user_id = (select auth.uid()));
 create policy preferred_nurses_patient_all on public.preferred_nurses for all to authenticated
-  using (patient_user_id = (select auth.uid()) or public.is_admin())
-  with check (patient_user_id = (select auth.uid()) or public.is_admin());
+  using (patient_user_id = (select auth.uid()) or app_private.is_admin())
+  with check (patient_user_id = (select auth.uid()) or app_private.is_admin());
 create policy recurring_care_patient_all on public.recurring_care_plans for all to authenticated
-  using (patient_user_id = (select auth.uid()) or public.is_admin())
-  with check (patient_user_id = (select auth.uid()) or public.is_admin());
+  using (patient_user_id = (select auth.uid()) or app_private.is_admin())
+  with check (patient_user_id = (select auth.uid()) or app_private.is_admin());
 create policy care_quotes_patient_select on public.care_quotes for select to authenticated
-  using (exists (select 1 from public.jobs j where j.id = job_id and j.patient_user_id = (select auth.uid())) or public.is_admin());
+  using (exists (select 1 from public.jobs j where j.id = job_id and j.patient_user_id = (select auth.uid())) or app_private.is_admin());
 create policy nurse_earnings_nurse_select on public.nurse_earning_records for select to authenticated
-  using (nurse_user_id = (select auth.uid()) or public.is_admin());
+  using (nurse_user_id = (select auth.uid()) or app_private.is_admin());
 
 drop trigger if exists nurse_availability_set_updated_at on public.nurse_availability_windows;
 create trigger nurse_availability_set_updated_at before update on public.nurse_availability_windows
