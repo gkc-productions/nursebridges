@@ -6,13 +6,15 @@ const TOKEN_KEY = "nursebridge_admin_access_token";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+let adminAuthClient: ReturnType<typeof createClient> | null = null;
 
 function getSupabaseClient() {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY env vars.");
   }
 
-  return createClient(supabaseUrl, supabaseAnonKey);
+  adminAuthClient ??= createClient(supabaseUrl, supabaseAnonKey);
+  return adminAuthClient;
 }
 
 function cleanToken(token: string) {
@@ -33,8 +35,13 @@ export function getAdminAccessToken(): string | null {
 }
 
 export async function restoreAdminAccessToken(): Promise<string | null> {
-  const { data, error } = await getSupabaseClient().auth.getSession();
-  if (error) throw error;
+  const client = getSupabaseClient();
+  const { data, error } = await client.auth.getSession();
+  if (error) {
+    setAdminAccessToken(null);
+    await client.auth.signOut({ scope: "local" }).catch(() => undefined);
+    return null;
+  }
 
   const token = data.session?.access_token ?? null;
   setAdminAccessToken(token);
