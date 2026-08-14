@@ -809,7 +809,7 @@ function PatientQuickActions({
     { label: "Request care", detail: "Tell us what you need", icon: "add-circle-outline", onPress: onRequest },
     { label: "View activity", detail: "Follow every request", icon: "receipt-outline", onPress: onActivity },
     {
-      label: "Updates",
+      label: "Messages",
       detail: unreadCount > 0 ? `${unreadCount} new ${unreadCount === 1 ? "message" : "messages"}` : "You're all caught up",
       icon: "notifications-outline",
       onPress: onUpdates
@@ -1503,7 +1503,8 @@ export default function App({ product = "patient" }: { product?: MobileProductId
   useEffect(() => {
     if (!session || !baseUrl) return;
     const job = role === "nurse" ? selectedJob : role === "patient" ? patientFocusJob : null;
-    if (!job || (role === "nurse" && job.assigned_nurse_user_id !== session.user.id)) {
+    const patientVisitUnavailable = role === "patient" && !["assigned", "completed"].includes(job?.status ?? "");
+    if (!job || patientVisitUnavailable || (role === "nurse" && job.assigned_nurse_user_id !== session.user.id)) {
       setVisitEvents([]);
       setVisitReport(null);
       setVisitFeedback(null);

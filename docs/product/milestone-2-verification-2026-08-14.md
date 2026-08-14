@@ -1,6 +1,6 @@
 # Milestone 2 Verification — 2026-08-14
 
-Status: implementation complete; production deployment and installed-device interaction remain separately gated.
+Status: implementation and installed-device startup verification complete; production deployment remains separately gated.
 
 ## Delivered
 
@@ -35,7 +35,10 @@ Status: implementation complete; production deployment and installed-device inte
   - Operations/safety: 30 tests passed.
 - iOS Simulator Debug build: passed with Xcode 27 beta.
 - Signed Debug build targeting connected `kossivi’s iPhone`: passed for bundle `com.nursebridges.mobile` and team `HKQJ75SQVF`.
-- The new artifact was not installed or launched; existing device app and data were not changed.
+- The signed artifact was installed as an in-place update without uninstalling or clearing the data container.
+- Physical-device launch succeeded with Metro reachable, the existing signed-in state restored, the patient Home screen rendered, and the existing API serving request/notification data.
+- Device proof exposed and verified a client guard fix: open requests no longer call the visit-progress endpoint before assignment, so an optional backend `404` no longer becomes a global red error.
+- The Home quick action and bottom navigation consistently label the destination `Messages`.
 
 ## Cost and external state
 
@@ -47,5 +50,5 @@ Status: implementation complete; production deployment and installed-device inte
 
 - Apply migrations and deploy the API only after a separate production approval and migration-history reconciliation plan.
 - Secure care-circle delivery/acceptance is a later operational enablement step; persisted consent alone does not grant or transmit protected information.
-- Physical-device installation and visual interaction proof require separate approval because installation would replace the existing Debug app in place.
+- Request messaging, trusted-nurse lookup, and care-circle invitation state cannot receive production end-to-end proof until their migration and API routes are separately approved and deployed.
 - No archive, App Store upload, distribution, production migration, or Git push was performed.
