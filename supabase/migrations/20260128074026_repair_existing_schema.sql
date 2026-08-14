@@ -55,6 +55,20 @@ begin
   ) then
     execute 'alter table public.jobs add column status public.job_status not null default ''open''';
   end if;
+
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='jobs' and column_name='title'
+  ) then
+    execute 'alter table public.jobs add column title text';
+  end if;
+
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='jobs' and column_name='description'
+  ) then
+    execute 'alter table public.jobs add column description text';
+  end if;
 end $$;
 
 -- Ensure timestamps exist
@@ -110,6 +124,20 @@ begin
     where table_schema='public' and table_name='applications' and column_name='created_at'
   ) then
     execute 'alter table public.applications add column created_at timestamptz not null default now()';
+  end if;
+
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='applications' and column_name='updated_at'
+  ) then
+    execute 'alter table public.applications add column updated_at timestamptz not null default now()';
+  end if;
+
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='applications' and column_name='note'
+  ) then
+    execute 'alter table public.applications add column note text';
   end if;
 end $$;
 
@@ -218,4 +246,3 @@ using (
   )
 )
 with check (true);
-

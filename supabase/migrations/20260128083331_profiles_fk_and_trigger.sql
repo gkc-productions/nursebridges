@@ -5,7 +5,28 @@
 -- 1) Ensure pgcrypto (uuid helpers)
 create extension if not exists pgcrypto;
 
--- 2) Ensure profiles.id is uuid + primary key already (your dump shows it is)
+-- 2) Normalize the baseline shape. The original baseline creates profiles.user_id,
+-- while existing deployed databases may already use profiles.id.
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles' and column_name = 'id'
+  ) and exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles' and column_name = 'user_id'
+  ) then
+    alter table public.profiles rename column user_id to id;
+  end if;
+
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles' and column_name = 'phone'
+  ) then
+    alter table public.profiles add column phone text;
+  end if;
+end $$;
+
 -- 3) Add FK: profiles.id references auth.users(id)
 do $$
 begin

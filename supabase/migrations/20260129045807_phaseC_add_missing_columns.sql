@@ -32,6 +32,17 @@ set name = coalesce(nullif(name,''), full_name)
 where name is null or name = '';
 
 -- 3) NURSE_PROFILES: code expects nurse_profiles.id
+create table if not exists public.nurse_profiles (
+  nurse_id uuid primary key references public.profiles(id) on delete cascade,
+  license_number text,
+  specialty text,
+  years_experience integer,
+  bio text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 alter table if exists public.nurse_profiles
   add column if not exists id uuid;
 
@@ -69,4 +80,3 @@ begin
     end;
   end if;
 end $$;
-
