@@ -6,9 +6,9 @@ const url = Constants.expoConfig?.extra?.supabaseUrl as string | undefined;
 const anonKey = Constants.expoConfig?.extra?.supabaseAnonKey as string | undefined;
 
 const storage = {
-  getItem: (key: string) => SecureStore.getItemAsync(`care:${key}`),
-  setItem: (key: string, value: string) => SecureStore.setItemAsync(`care:${key}`, value),
-  removeItem: (key: string) => SecureStore.deleteItemAsync(`care:${key}`)
+  getItem: (key: string) => SecureStore.getItemAsync(`care.${key}`),
+  setItem: (key: string, value: string) => SecureStore.setItemAsync(`care.${key}`, value),
+  removeItem: (key: string) => SecureStore.deleteItemAsync(`care.${key}`)
 };
 
 export const hasSupabaseConfig = Boolean(url && anonKey);
