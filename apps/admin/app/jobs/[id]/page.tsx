@@ -236,7 +236,7 @@ export default function JobDetailPage() {
               <div><dt>Assigned nurse</dt><dd>{job.nurse_name ?? job.nurse_user_id ?? "Unassigned"}</dd></div>
               <div><dt>Service area</dt><dd>{[job.service_city, job.service_state].filter(Boolean).join(", ") || "-"}</dd></div>
               <div><dt>Appointment</dt><dd>{formatDateTime(job.start_time)}</dd></div>
-              <div><dt>Rate</dt><dd>{formatRate(job.hourly_rate)}</dd></div>
+              <div><dt>Legacy rate field</dt><dd>{formatRate(job.hourly_rate)}</dd></div>
               <div><dt>Requested</dt><dd>{formatDateTime(job.created_at)}</dd></div>
             </dl>
             <div className="detail-note"><span>Request notes</span><p>{job.description ?? "No additional notes provided."}</p></div>

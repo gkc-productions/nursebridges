@@ -454,8 +454,8 @@ export function formatDate(value: string | null) {
 }
 
 export function formatRate(value: number | null) {
-  if (value === null || value === undefined) return "-";
-  return `$${value}/hr`;
+  if (value === null || value === undefined) return "Care team will confirm";
+  return `Legacy estimate · $${value}/hr`;
 }
 
 type LogisticsDetail = {

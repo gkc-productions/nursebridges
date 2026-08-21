@@ -105,7 +105,7 @@ export default function JobsPage() {
             <th>Request</th>
             <th>Patient</th>
             <th>Start</th>
-            <th>Rate</th>
+            <th>Pricing status</th>
             <th>Applicants</th>
             <th>Assigned</th>
             <th>Created</th>
@@ -124,7 +124,7 @@ export default function JobsPage() {
               </td>
               <td>{job.patient_name ?? "-"}</td>
               <td>{formatDateTime(job.start_time)}</td>
-              <td>{formatRate(job.hourly_rate)}</td>
+              <td>{job.hourly_rate == null ? "Quote pending" : `${formatRate(job.hourly_rate)} legacy`}</td>
               <td>{job.applicant_count}</td>
               <td>{job.nurse_name ?? "-"}</td>
               <td>{formatDateTime(job.created_at)}</td>

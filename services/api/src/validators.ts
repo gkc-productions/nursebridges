@@ -138,6 +138,17 @@ export const visitReportSchema = z.object({
   provider_instructions: optionalTrimmedString(4000),
   follow_up_tasks: optionalTrimmedString(2000),
   transportation_outcome: optionalTrimmedString(1000)
+}).superRefine((value, context) => {
+  if (value.status !== "submitted") return;
+  const required: Array<[keyof typeof value, string]> = [
+    ["visit_summary", "Document the support provided before submitting."],
+    ["provider_instructions", "Record the provider instructions, or enter “None provided.”"],
+    ["follow_up_tasks", "Record follow-up ownership, or enter “None identified.”"],
+    ["transportation_outcome", "Document the transportation and safe-handoff outcome."]
+  ];
+  for (const [field, message] of required) {
+    if (!value[field]?.trim()) context.addIssue({ code: "custom", path: [field], message });
+  }
 });
 
 export const patientFeedbackSchema = z.object({
@@ -185,6 +196,15 @@ export const nurseAvailabilitySchema = z.object({
     if (endsAt <= startsAt) context.addIssue({ code: "custom", path: ["ends_at"], message: "End time must be after start time." });
     if (endsAt - startsAt > 31 * 24 * 60 * 60 * 1000) context.addIssue({ code: "custom", path: ["ends_at"], message: "Availability windows cannot exceed 31 days." });
   })).max(50)
+}).superRefine((value, context) => {
+  const ordered = value.windows
+    .map((window, index) => ({ index, startsAt: new Date(window.starts_at).getTime(), endsAt: new Date(window.ends_at).getTime() }))
+    .sort((left, right) => left.startsAt - right.startsAt);
+  for (let index = 1; index < ordered.length; index += 1) {
+    if (ordered[index].startsAt < ordered[index - 1].endsAt) {
+      context.addIssue({ code: "custom", path: ["windows", ordered[index].index, "starts_at"], message: "Availability windows cannot overlap." });
+    }
+  }
 });
 
 export const supportCaseSchema = z.object({

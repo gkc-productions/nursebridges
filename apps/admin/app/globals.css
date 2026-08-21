@@ -86,6 +86,13 @@ tbody tr { transition: background .15s ease; } tbody tr:hover { background: var(
 .grid { display: grid; gap: 16px; } .grid.two { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
 .notice { background: color-mix(in srgb, var(--danger) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--danger) 28%, transparent); border-radius: 14px; color: var(--danger); margin-bottom: 14px; padding: 12px 14px; }
+.collision-notice { align-items: center; background: color-mix(in srgb, var(--coral) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--coral) 35%, var(--border)); border-radius: 12px; color: var(--ink); display: flex; gap: 12px; margin: 0 24px 18px; padding: 12px 14px; }
+.collision-notice strong { flex: 0 0 auto; font-size: 12px; }
+.collision-notice span { color: var(--muted); font-size: 12px; }
+.success-notice { background: #e7f7ef; border: 1px solid #9bd2b6; border-radius: 12px; color: #176442; font-weight: 700; margin: 0 0 18px; padding: 12px 14px; }
+.inline-checkbox { align-items: center; display: inline-flex; font-weight: 700; gap: 8px; }
+.inline-checkbox input { height: 18px; width: 18px; }
+.overdue-text { color: var(--coral); font-weight: 800; }
 section a { color: var(--accent); font-weight: 800; }
 .hero-panel { align-items: center; background: radial-gradient(circle at 85% 20%, rgba(50,196,178,.16), transparent 32%), #0d1715; border-color: #20332e; color: white; display: flex; justify-content: space-between; min-height: 160px; padding: clamp(24px, 3vw, 36px); }
 .hero-panel h2 { font-size: clamp(26px, 3vw, 38px); letter-spacing: -.05em; line-height: 1.02; max-width: 720px; }

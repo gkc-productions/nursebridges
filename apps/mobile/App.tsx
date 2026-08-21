@@ -54,6 +54,8 @@ import type {
   NotificationRow,
   NurseProfile,
   PatientVisitFeedbackRow,
+  RecurringCarePlanListResponse,
+  RecurringCarePlanRow,
   TrustedNurse,
   TrustedNurseResponse,
   UserRole,
@@ -387,7 +389,7 @@ function PatientRequestDetailPanel({
         { label: "Mobility", value: detail.mobility },
         { label: "Transportation", value: detail.transportation },
         { label: "On-site contact", value: detail.onsiteContact },
-        { label: "Rate", value: detail.rate },
+        { label: "Pricing", value: detail.rate },
         { label: "Related updates", value: detail.relatedUpdates }
       ]}
       timeline={detail.timeline}
@@ -527,7 +529,8 @@ function PatientVisitOutcomePanel({
   onSubmit,
   recurringCadence,
   onRecurringCadence,
-  onRequestRecurring
+  onRequestRecurring,
+  onStartRebooking
 }: {
   report: VisitReportRow | null;
   feedback: PatientVisitFeedbackRow | null;
@@ -544,6 +547,7 @@ function PatientVisitOutcomePanel({
   recurringCadence: "weekly" | "biweekly" | "monthly";
   onRecurringCadence: (value: "weekly" | "biweekly" | "monthly") => void;
   onRequestRecurring: () => void;
+  onStartRebooking: () => void;
 }) {
   return (
     <View style={styles.card}>
@@ -578,6 +582,10 @@ function PatientVisitOutcomePanel({
       </TouchableOpacity>
       <Text style={styles.formPrivacyNote}>Your feedback and rebooking preference are visible to NurseBridges administrators, not the nurse.</Text>
       <Text style={styles.supportTitle}>Need this support again?</Text>
+      <TouchableOpacity style={styles.secondaryButton} onPress={onStartRebooking} disabled={actionLoading}>
+        <Text style={styles.secondaryButtonText}>Start another request with these details</Text>
+      </TouchableOpacity>
+      <Text style={styles.formPrivacyNote}>We copy the practical plan for review, but clear the date, pickup time, and arrival instructions because they may have changed.</Text>
       <ChoiceGroup value={recurringCadence} options={[{ value: "weekly", label: "Weekly" }, { value: "biweekly", label: "Every 2 weeks" }, { value: "monthly", label: "Monthly" }]} onChange={(value) => onRecurringCadence(value as "weekly" | "biweekly" | "monthly")} />
       <TouchableOpacity style={styles.secondaryButton} onPress={onRequestRecurring} disabled={actionLoading}>
         <Text style={styles.secondaryButtonText}>Request recurring care review</Text>
@@ -607,6 +615,22 @@ function PatientVisitProgressPanel({ events }: { events: VisitEventRow[] }) {
       {events.some((event) => event.event_type === "escalation_requested") ? <Text style={styles.error}>The operations team has been asked to review this visit.</Text> : null}
     </View>
   );
+}
+
+function RecurringCarePanel({ plans }: { plans: RecurringCarePlanRow[] }) {
+  const activePlans = plans.filter((plan) => !["cancelled", "completed"].includes(plan.status));
+  if (!activePlans.length) return null;
+  return <View style={styles.card}>
+    <SectionHeader eyebrow="Ongoing support" title="Recurring-care requests" />
+    <Text style={styles.sectionIntro}>A recurring pattern never guarantees a visit. The care team reviews scope, availability, assignment, and pricing for every occurrence.</Text>
+    {activePlans.map((plan) => <View style={styles.supportPanel} key={plan.id}>
+      <FieldRow label="Pattern" value={plan.cadence === "biweekly" ? "Every 2 weeks" : plan.cadence.replace(/^./, (letter) => letter.toUpperCase())} />
+      <FieldRow label="Preferred time" value={`${plan.local_time.slice(0, 5)} · ${plan.timezone}`} />
+      <FieldRow label="Begins" value={new Date(`${plan.starts_on}T12:00:00`).toLocaleDateString()} />
+      <FieldRow label="Status" value={plan.status.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} />
+      <Text style={styles.formPrivacyNote}>{plan.status === "pending_review" ? "A coordinator is reviewing this request." : plan.status === "active" ? "The pattern is approved; individual visits still require confirmation." : "This pattern is currently paused."}</Text>
+    </View>)}
+  </View>;
 }
 
 function ErrorNotice({ message, onCopy }: { message: string; onCopy: () => void }) {
@@ -1180,6 +1204,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
   const [jobMessages, setJobMessages] = useState<JobMessageRow[]>([]);
   const [messageDraft, setMessageDraft] = useState("");
   const [trustedNurse, setTrustedNurse] = useState<TrustedNurse | null>(null);
+  const [recurringCarePlans, setRecurringCarePlans] = useState<RecurringCarePlanRow[]>([]);
 
   const [jobForm, setJobForm] = useState(emptyJobForm);
   const [verificationDocumentType, setVerificationDocumentType] = useState("license");
@@ -1566,8 +1591,12 @@ export default function App({ product = "patient" }: { product?: MobileProductId
     setError(null);
 
     try {
-      const data = await apiFetch<JobListResponse>(baseUrl, session, "/jobs");
+      const [data, recurring] = await Promise.all([
+        apiFetch<JobListResponse>(baseUrl, session, "/jobs"),
+        apiFetch<RecurringCarePlanListResponse>(baseUrl, session, "/marketplace/recurring-care").catch(() => ({ plans: [] }))
+      ]);
       setPatientJobs(data.jobs ?? []);
+      setRecurringCarePlans(recurring.plans ?? []);
     } catch {
       setError("Unable to load your care requests.");
     } finally {
@@ -2136,11 +2165,46 @@ export default function App({ product = "patient" }: { product?: MobileProductId
         })
       });
       setNotice("Recurring care request sent for coordinator review.");
+      await loadPatientJobs();
     } catch (err) {
       setError(formatApiErrorMessage("Unable to request recurring care.", err));
     } finally {
       setActionLoading(false);
     }
+  }
+
+  function startRebooking(job: JobRow) {
+    const logistics = job.logistics;
+    setJobForm({
+      ...emptyJobForm,
+      title: job.title,
+      description: job.description ?? "",
+      residence_type: logistics?.residence_type ?? emptyJobForm.residence_type,
+      street_address: logistics?.street_address ?? "",
+      unit: logistics?.unit ?? "",
+      building_name: logistics?.building_name ?? "",
+      city: logistics?.city ?? job.service_city ?? "",
+      state: logistics?.state ?? job.service_state ?? "GA",
+      postal_code: logistics?.postal_code ?? "",
+      stairs: logistics?.stairs ?? emptyJobForm.stairs,
+      elevator_available: logistics?.elevator_available == null ? "unknown" : logistics.elevator_available ? "yes" : "no",
+      meeting_point: logistics?.meeting_point ?? "",
+      parking_notes: logistics?.parking_notes ?? "",
+      arrival_instructions: "",
+      mobility_aids: logistics?.mobility_aids ?? [],
+      mobility_notes: logistics?.mobility_notes ?? "",
+      onsite_contact_name: logistics?.onsite_contact_name ?? "",
+      onsite_contact_relationship: logistics?.onsite_contact_relationship ?? "",
+      onsite_contact_phone: logistics?.onsite_contact_phone ?? "",
+      transportation_mode: (logistics?.transportation_mode as typeof emptyJobForm.transportation_mode | undefined) ?? emptyJobForm.transportation_mode,
+      transportation_provider: logistics?.transportation_provider ?? "",
+      pickup_time: "",
+      return_plan: (logistics?.return_plan as typeof emptyJobForm.return_plan | undefined) ?? emptyJobForm.return_plan,
+      transportation_notes: logistics?.transportation_notes ?? ""
+    });
+    setRequestStep(2);
+    setPatientTab("new");
+    setNotice("Previous practical details copied. Choose a new date and review every step before submitting.");
   }
 
   async function handleJobTransition(job: JobRow, action: "cancel" | "complete") {
@@ -2686,8 +2750,10 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                     recurringCadence={recurringCadence}
                     onRecurringCadence={setRecurringCadence}
                     onRequestRecurring={() => void requestRecurringCare(patientFocusJob)}
+                    onStartRebooking={() => startRebooking(patientFocusJob)}
                   />
                 ) : null}
+                <RecurringCarePanel plans={recurringCarePlans} />
                 {patientFocusJob ? (
                   <TouchableOpacity accessibilityRole="button" style={styles.activityPreview} onPress={() => setPatientTab("records")}>
                     <View style={styles.flex}>
@@ -3143,7 +3209,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                           { label: "Assigned nurse", value: job.assigned_nurse_name ?? job.assigned_nurse_user_id },
                           { label: "Start", value: formatDate(job.start_time) },
                           { label: "Residence", value: job.logistics ? [job.logistics.street_address, job.logistics.unit, job.logistics.city, job.logistics.state].filter(Boolean).join(", ") : formatServiceArea(job) },
-                          { label: "Rate", value: formatRate(job.hourly_rate) }
+                          { label: "Pricing", value: formatRate(job.hourly_rate) }
                         ]}
                         actions={[
                           ...(canCancelJob(job)
@@ -3196,7 +3262,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                         fields={[
                           { label: "Start", value: formatDate(job.start_time) },
                           { label: "Service area", value: formatServiceArea(job) },
-                          { label: "Rate", value: formatRate(job.hourly_rate) }
+                          { label: "Pricing", value: formatRate(job.hourly_rate) }
                         ]}
                         badge={applicationLabel}
                         selected={selectedJob?.id === job.id}
@@ -3246,7 +3312,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                         fields={[
                           { label: "Start", value: formatDate(job.start_time) },
                           { label: job.logistics ? "Residence" : "Service area", value: job.logistics ? [job.logistics.street_address, job.logistics.unit, job.logistics.city, job.logistics.state].filter(Boolean).join(", ") : formatServiceArea(job) },
-                          { label: "Rate", value: formatRate(job.hourly_rate) }
+                          { label: "Pricing", value: formatRate(job.hourly_rate) }
                         ]}
                         badge={applicationLabel}
                         selected={selectedJob?.id === job.id}
@@ -3315,7 +3381,7 @@ export default function App({ product = "patient" }: { product?: MobileProductId
                   { label: "Application", value: nurseRequestDetail.applicationState },
                   { label: nurseRequestDetail.assignedToYou ? "Residence" : "Service area", value: nurseRequestDetail.location },
                   { label: "Start", value: nurseRequestDetail.start },
-                  { label: "Rate", value: nurseRequestDetail.rate },
+                  { label: "Legacy compensation estimate", value: nurseRequestDetail.rate },
                   ...(nurseRequestDetail.assignedToYou ? [
                     { label: "Arrival and access", value: nurseRequestDetail.access },
                     { label: "Mobility", value: nurseRequestDetail.mobility },

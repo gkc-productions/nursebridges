@@ -110,8 +110,8 @@ describe("mobile workflow helpers", () => {
   it("formats job fields without crashing on missing or invalid values", () => {
     assert.equal(formatDate(null), "-");
     assert.equal(formatDate("not a date"), "not a date");
-    assert.equal(formatRate(null), "-");
-    assert.equal(formatRate(40), "$40/hr");
+    assert.equal(formatRate(null), "Care team will confirm");
+    assert.equal(formatRate(40), "Legacy estimate · $40/hr");
   });
 
   it("uses patient-safe care request copy instead of internal job language", () => {
@@ -259,7 +259,7 @@ describe("mobile workflow helpers", () => {
     assert.equal(detail.summary, "A nurse or caregiver has been assigned.");
     assert.equal(detail.assignedCaregiver, "Avery Nurse");
     assert.notEqual(detail.start, "-");
-    assert.equal(detail.rate, "$45/hr");
+    assert.equal(detail.rate, "Legacy estimate · $45/hr");
     assert.equal(detail.location, "123 Test Street");
     assert.equal(detail.relatedUpdates, 2);
     assert.equal(detail.canCancel, true);
@@ -340,7 +340,7 @@ describe("mobile workflow helpers", () => {
     assert.equal(detail.canComplete, false);
     assert.equal(detail.assignedToYou, false);
     assert.notEqual(detail.start, "-");
-    assert.equal(detail.rate, "$40/hr");
+    assert.equal(detail.rate, "Legacy estimate · $40/hr");
     assert.equal(detail.location, "Service area not provided");
     assert.equal(detail.description, "Help getting to an appointment.");
   });

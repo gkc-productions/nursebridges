@@ -19,7 +19,7 @@ export default {
     },
     ios: {
       bundleIdentifier: "com.nursebridges.mobile",
-      buildNumber: "4",
+      buildNumber: "6",
       supportsTablet: false,
       icon: "./assets/icon-light.png",
       infoPlist: {

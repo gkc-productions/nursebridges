@@ -138,10 +138,23 @@ describe("visit coordination schemas", () => {
     assert.deepEqual(visitEventSchema.parse({ event_type: "patient_handoff" }), {
       event_type: "patient_handoff"
     });
-    assert.deepEqual(visitReportSchema.parse({ status: "submitted", visit_summary: "Patient returned home safely." }), {
+    assert.deepEqual(visitReportSchema.parse({
       status: "submitted",
-      visit_summary: "Patient returned home safely."
+      visit_summary: "Patient returned home safely.",
+      provider_instructions: "None provided",
+      follow_up_tasks: "None identified",
+      transportation_outcome: "Patient returned home with family."
+    }), {
+      status: "submitted",
+      visit_summary: "Patient returned home safely.",
+      provider_instructions: "None provided",
+      follow_up_tasks: "None identified",
+      transportation_outcome: "Patient returned home with family."
     });
+    assert.throws(
+      () => visitReportSchema.parse({ status: "submitted", visit_summary: "Patient returned home safely." }),
+      (error) => error instanceof ZodError && error.issues.some((issue) => issue.path.join(".") === "provider_instructions")
+    );
   });
 
   it("rejects invalid ratings and incomplete care-circle consent", () => {

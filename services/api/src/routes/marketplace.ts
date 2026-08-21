@@ -59,14 +59,9 @@ export async function marketplaceRoutes(app: FastifyInstance) {
     requireRole(authed, ["nurse"]);
     const body = nurseAvailabilitySchema.parse(req.body ?? {});
     const sb = supabaseForUser(authed.jwt);
-    const { error: deleteError } = await sb.from("nurse_availability_windows").delete().eq("nurse_user_id", authed.userId);
-    if (deleteError) return reply.code(400).send({ error: "Unable to update availability" });
-    if (body.windows.length === 0) return reply.send({ availability: [] });
-    const { data, error } = await sb.from("nurse_availability_windows")
-      .insert(body.windows.map((window) => ({ ...window, nurse_user_id: authed.userId })))
-      .select("id,starts_at,ends_at,timezone,recurrence").order("starts_at");
+    const { data, error } = await sb.rpc("replace_my_nurse_availability", { p_windows: body.windows });
     if (error) return reply.code(400).send({ error: "Unable to update availability" });
-    return reply.send({ availability: data ?? [] });
+    return reply.send({ availability: Array.isArray(data) ? data : [] });
   });
 
   app.get("/support-cases", async (req, reply) => {

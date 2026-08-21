@@ -14,7 +14,7 @@ export type JobLogistics = {
   meeting_point: string | null;
   parking_notes: string | null;
   arrival_instructions: string | null;
-  mobility_aids: string[];
+  mobility_aids: Array<"cane" | "walker" | "wheelchair" | "scooter" | "other">;
   mobility_notes: string | null;
   onsite_contact_name: string | null;
   onsite_contact_relationship: string | null;
@@ -196,6 +196,25 @@ export type PatientVisitFeedbackRow = {
   comments: string | null;
   would_rebook: boolean | null;
   prefer_same_nurse: boolean;
+};
+
+export type RecurringCarePlanRow = {
+  id: string;
+  source_job_id: string | null;
+  preferred_nurse_user_id: string | null;
+  cadence: "weekly" | "biweekly" | "monthly";
+  starts_on: string;
+  ends_on: string | null;
+  local_time: string;
+  timezone: string;
+  status: "draft" | "pending_review" | "active" | "paused" | "completed" | "cancelled";
+  occurrences_limit: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RecurringCarePlanListResponse = {
+  plans: RecurringCarePlanRow[];
 };
 
 export type ApiIssue = {
