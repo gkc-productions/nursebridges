@@ -44,9 +44,19 @@ Status: implementation complete in the consolidation checkout. Production migrat
 - Nurse Release build 5 succeeded for `com.nursebridges.care` with an embedded JavaScript bundle, linked `RNDateTimePicker`, and team entitlement `HKQJ75SQVF`.
 - The connected iPhone was unavailable during final verification, so these new artifacts were not installed or launched and no existing app data was touched.
 
+## Isolated database verification — 2026-08-23
+
+- Restored and verified the isolated Supabase project `nursebridge-milestone2-dev` (`sxzhmflzegkznqrszrfv`); production was not accessed or changed.
+- Replayed the milestone 3–5 foundation, grants hardening, atomic nurse-availability, and safe admin-team migrations in repository order.
+- Confirmed the availability and admin-team tables, required nurse-profile columns, and both new RPC signatures exist.
+- Confirmed `replace_my_nurse_availability(jsonb)` is executable by `authenticated` but not `anon`.
+- Confirmed `manage_admin_team_member(uuid,uuid,text,boolean)` and `bump_operations_case(...)` are executable by `service_role` but not `authenticated` or `anon`.
+- Confirmed all eight checked milestone tables have row-level security enabled. `visit_arrival_verifications` intentionally has no client policy, leaving it unavailable to client roles.
+- Supabase Security Advisor reported zero errors. Its one warning concerns the pre-existing permissive `public.applications` policy and was not introduced by these migrations.
+- The scripts were replayed through the SQL editor for isolated validation; no manual rows were inserted into `supabase_migrations.schema_migrations`.
+
 ## Remaining controlled gates
 
-- Replay and lint the two new migrations in an isolated Supabase project. Local database lint was unavailable because Docker/Podman is not installed.
 - Review and approve the database/API/admin deployment sequence before changing production.
 - After deployment, run role-specific smoke tests for availability replacement, supervisor bootstrap/final-supervisor protection, recurring-care transitions, service recovery, and the locked finance ledger.
 - Install the signed patient and nurse artifacts in place on an available iPhone and verify the new native date/time picker and core signed-in/signed-out flows.
