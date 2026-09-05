@@ -52,7 +52,9 @@ Status: implementation complete in the consolidation checkout. Production migrat
 - Confirmed `replace_my_nurse_availability(jsonb)` is executable by `authenticated` but not `anon`.
 - Confirmed `manage_admin_team_member(uuid,uuid,text,boolean)` and `bump_operations_case(...)` are executable by `service_role` but not `authenticated` or `anon`.
 - Confirmed all eight checked milestone tables have row-level security enabled. `visit_arrival_verifications` intentionally has no client policy, leaving it unavailable to client roles.
-- Supabase Security Advisor reported zero errors. Its one warning concerns the pre-existing permissive `public.applications` policy and was not introduced by these migrations.
+- Replaced the pre-existing permissive `public.applications` update policy with a nurse-owned, `applied`-to-`withdrawn` policy and restricted authenticated updates to the `status` column.
+- Confirmed `authenticated` has no table-wide update privilege and cannot update `job_id`, `nurse_user_id`, or `note`.
+- Supabase Security Advisor reported zero warnings and zero errors. Its three remaining notices are informational for intentionally server-only RLS tables with no client policies.
 - The scripts were replayed through the SQL editor for isolated validation; no manual rows were inserted into `supabase_migrations.schema_migrations`.
 
 ## Remaining controlled gates
