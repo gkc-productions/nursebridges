@@ -5,8 +5,15 @@ import path from "node:path";
 
 const migrationPath =
   "supabase/migrations/20260905033308_harden_milestones_3_5_authenticated_grants.sql";
+const privateRpcMigrationPath =
+  "supabase/migrations/20260905035335_move_availability_definer_to_private_schema.sql";
 const sql = fs
   .readFileSync(path.join(process.cwd(), migrationPath), "utf8")
+  .toLowerCase()
+  .replace(/\s+/g, " ")
+  .trim();
+const privateRpcSql = fs
+  .readFileSync(path.join(process.cwd(), privateRpcMigrationPath), "utf8")
   .toLowerCase()
   .replace(/\s+/g, " ")
   .trim();
@@ -21,6 +28,13 @@ function requirePattern(pattern, description) {
 function forbid(pattern, description) {
   if (pattern.test(sql)) {
     console.error(`${migrationPath} contains unsafe SQL: ${description}`);
+    process.exit(1);
+  }
+}
+
+function requirePrivateRpcPattern(pattern, description) {
+  if (!pattern.test(privateRpcSql)) {
+    console.error(`${privateRpcMigrationPath} is missing: ${description}`);
     process.exit(1);
   }
 }
@@ -62,5 +76,22 @@ forbid(/grant\s+[^;]*public\.operations_case_presence[^;]*\bto authenticated\b/,
 forbid(/grant\s+[^;]*public\.visit_arrival_verifications[^;]*\bto authenticated\b/, "direct arrival-secret access");
 forbid(/grant\s+[^;]*public\.marketplace_quality_signals[^;]*\bto authenticated\b/, "direct quality-signal access");
 forbid(/grant\s+[^;]*public\.admin_team_members[^;]*\bto authenticated\b/, "direct admin-team access");
+
+requirePrivateRpcPattern(
+  /alter function public\.replace_my_nurse_availability\(jsonb\) set schema app_private/,
+  "migration of the privileged implementation to app_private"
+);
+requirePrivateRpcPattern(
+  /create function public\.replace_my_nurse_availability\(p_windows jsonb\).*security invoker.*select app_private\.replace_my_nurse_availability\(p_windows\)/,
+  "an unprivileged public RPC wrapper"
+);
+requirePrivateRpcPattern(
+  /revoke all on function app_private\.replace_my_nurse_availability\(jsonb\) from public, anon, authenticated, service_role/,
+  "an explicit private-helper privilege reset"
+);
+requirePrivateRpcPattern(
+  /grant execute on function app_private\.replace_my_nurse_availability\(jsonb\) to authenticated, service_role/,
+  "authenticated execution of the non-exposed helper through the wrapper"
+);
 
 console.log("Milestones 3-5 grants readiness verification passed.");
