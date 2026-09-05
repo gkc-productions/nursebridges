@@ -1,6 +1,6 @@
 # Milestones 3–5 Production Preflight — updated 2026-09-04
 
-Status: **the approved production migrations and forward security correction succeeded**. Production functions, policies, grants, migration history, advisor check, and rolled-back atomic smoke match the verified target state. No application deployment or data seeding has been performed.
+Status: **the approved production migrations and forward security correction succeeded; application deployment is blocked by the offline VM**. Production functions, policies, grants, migration history, advisor check, and rolled-back atomic smoke match the verified target state. A clean release checkout passed full verification and production builds. No application deployment or data seeding has been performed.
 
 ## Verified source checkpoint
 
@@ -62,9 +62,9 @@ These results are not a mandate for blanket changes. Client-readable tables can 
 
 ## Required rollout sequence
 
-1. Push the reviewed source commits to the consolidation branch only.
-2. Create a clean, recoverable deployment checkout or artifact from the reviewed commit. Do not deploy by cleaning or overwriting the dirty VM original.
-3. Deploy API and admin from the same verified commit, restarting only their own services and checking privacy-safe health/log evidence.
+1. Restore network/SSH reachability to `nursebridge-vm`; do not alter the dirty original checkout while doing so.
+2. Inspect the active service units and deployment paths read-only after reconnection.
+3. Deploy API and admin from commit `8fe3cd47afba5962c4b61546c3a0b9326ff3e56b` using a separate clean VM checkout, restarting only their own services and checking privacy-safe health/log evidence.
 4. Run non-mutating smoke preflight first. Run role-based mutating smoke only with explicit production-smoke approval.
 
 ## Rollback and stop conditions
@@ -88,6 +88,9 @@ These results are not a mandate for blanket changes. Client-readable tables can 
 - Production private-helper correction and function-privilege verification: passed.
 - Production atomic-availability smoke: passed inside a rolled-back transaction; existing nurse availability was not persisted or changed.
 - Production security advisor after correction: temporary privileged-public-function warning removed.
-- Clean production deployment source: not yet prepared.
+- GitHub consolidation branch: pushed and verified at `8fe3cd47afba5962c4b61546c3a0b9326ff3e56b`; `main` was not changed.
+- Clean local release checkout: `/Users/kossivigbleguede/Documents/Nurse Bridge/nursebridge-release-20260905T035824Z` at detached commit `8fe3cd47afba5962c4b61546c3a0b9326ff3e56b`.
+- Clean release verification: frozen-lockfile install, full `pnpm verify`, and `pnpm build` passed. Shared, API, and admin production builds succeeded.
+- VM deployment: blocked. SSH reports host `192.168.1.111` down; the public API health endpoint returns Cloudflare `530`. The admin hostname returns the expected Cloudflare Access `302`, which does not prove origin health.
 
 Supabase reference: [Securing your API](https://supabase.com/docs/guides/api/securing-your-api) explains that object grants and RLS are separate, required layers and recommends explicit least-privilege grants.
