@@ -1,59 +1,93 @@
-# Milestones 3–5 Production Preflight — 2026-08-28
+# Milestones 3–5 Production Preflight — updated 2026-09-04
 
-Status: **blocked before production mutation**. The implementation and isolated database proof are complete, but production migration history cannot be reconciled while the production Supabase project is inactive, and the production VM checkout is not a clean copy of the verified consolidation commit.
+Status: **production is healthy; database mutation remains blocked pending review**. The production project was restored with approval and inspected read-only. The inspection found repository migrations that are not present in production plus legacy object-grant drift that must be corrected in a verified order. No production SQL, migration, application deployment, or data mutation has been performed.
 
 ## Verified source checkpoint
 
 - Local branch: `consolidation/mac-work-20260730T181122Z`
-- Local commit: `c6add90c709c98e4b201ea7952f243130c9b81f3`
-- GitHub branch tip: `5daad535bf83db77ecea412f2df907a3dd21ef6f`
-- The local branch is two commits ahead of GitHub:
-  - `da7c2cb` — milestone 3–5 implementation foundation
-  - `c6add90` — isolated database verification evidence
-- Known generated `services/api/dist`, `packages/shared/dist`, and TypeScript build-info output remains unstaged and must not be included in a source checkpoint.
+- Local inspected commit: `6c827cbf5a7a74a561b41d953d26f8b6cfcbb2b8`
+- GitHub branch tip: `e2a6d67812a871b0f1611222a70ee533109f64a1`
+- The local checkout contains known generated API, shared-package, and TypeScript build-info output. It remains unstaged and must not be included in a source checkpoint or deployment artifact.
+- The original VM and Mac staging copies remain out of scope and must not be cleaned, reset, overwritten, or used as an unreviewed deployment source.
 
 ## Production observations
 
 - Supabase production project: `nursebridge` (`bkhxrlvxtzeutdnatgwd`)
-- Supabase status: `INACTIVE`
-- Migration and table metadata calls are unavailable while the project is inactive.
-- No production Supabase restore, query, migration, role, policy, data, or configuration change was performed.
-- Production API health returned HTTP 200.
-- Production admin root returned the expected HTTP 302 protected redirect.
-- VM services `nursebridge-api` and `nursebridge-admin` are active.
-- VM checkout remains on `checkpoint/vm-working-tree-20260730T181045Z` at `0db34d97953a1d6917ac66a8565541be69033479` with existing tracked and untracked work. It must not be cleaned, reset, overwritten, or used as an unreviewed deployment source.
+- Project status after the approved restore: `ACTIVE_HEALTHY`
+- The `authenticator` role has no `pgrst.db_schemas` override. Dashboard exposed-schema settings are not being overridden by role configuration.
+- All required Milestones 3–5 tables exist and have RLS enabled.
+- The production migration ledger contains replayed repository changes under different timestamps/names. Migration history must not be edited or marked repaired by assumption.
+- These newer repository changes are absent from the production ledger and their effects are absent from the inspected schema:
+  - `20260821124432_replace_nurse_availability_atomically.sql`
+  - `20260821124834_manage_admin_team_members_safely.sql`
+  - `20260905020527_harden_applications_withdrawal_policy.sql`
+- `replace_my_nurse_availability(jsonb)` and `manage_admin_team_member(uuid,uuid,text,boolean)` are absent.
+- `applications_update_related` remains present with an always-true check; the withdrawal-only policy and status-column-only update grant are absent.
+- `bump_operations_case(...)` is service-role-only as intended.
 
-## Current platform compatibility note
+## Effective-grant findings
 
-Supabase now requires explicit object grants in addition to RLS for Data API access. The milestone migrations explicitly configure table/function grants and were verified in the isolated project. Before production rollout, the production Data API exposed-schema configuration and effective grants must be inspected read-only after the project is restored.
+Production was created under older Supabase public-schema defaults. RLS restricts rows, but many `authenticated` table grants still include `DELETE`, `REFERENCES`, `TRIGGER`, and `TRUNCATE` even though NurseBridge clients do not use those operations.
+
+The local compatibility migration `20260905033308_harden_milestones_3_5_authenticated_grants.sql` resets only the Milestones 3–5 tables and grants back the direct client operations verified from source:
+
+- nurse availability: `SELECT`; replacement writes go through the nurse-authorized atomic RPC, hardened to owner-privileged execution with an empty search path before direct write grants are removed
+- support cases: `SELECT, INSERT`
+- reporter-visible case notes: `SELECT`
+- preferred nurses: `SELECT, INSERT, UPDATE`
+- recurring care plans: `SELECT, INSERT`
+- care quotes and nurse earnings: `SELECT`
+- admin team, admin presence, arrival verification, and quality signals: service role only
+
+It deliberately does not touch the unrelated `agent_tasks`, `agent_runs`, or `set_agent_tasks_updated_at` objects found in production.
+
+## Advisor baseline
+
+- Security advisor: 42 findings (`5 INFO`, `37 WARN`)
+  - 5 RLS-enabled tables without policies
+  - 1 mutable function search path on unrelated `set_agent_tasks_updated_at`
+  - 10 anonymous GraphQL exposure findings
+  - 25 authenticated GraphQL exposure findings
+  - 1 leaked-password-protection setting warning
+- Performance advisor: 190 findings (`66 INFO`, `124 WARN`)
+  - 16 unindexed foreign keys
+  - 38 RLS init-plan recommendations
+  - 50 unused indexes
+  - 82 multiple-permissive-policy findings
+  - 4 duplicate-index findings
+
+These are a baseline, not a mandate for blanket changes. Client-readable tables can legitimately remain visible to authenticated GraphQL introspection. Unrelated agent objects and authentication settings require separate ownership/product decisions.
 
 ## Required rollout sequence
 
-1. Obtain explicit approval to restore/resume the production Supabase project.
-2. Inspect production migration history, required tables/columns, role overrides, exposed schemas, RLS, grants, function signatures, and security advisors without mutation.
-3. Produce the exact ordered list of missing repository migrations. Stop on schema/history ambiguity; do not repair migration history by assumption.
-4. Push the two verified local commits to the existing GitHub consolidation branch after separate push approval.
-5. Create a clean, recoverable deployment checkout or artifact from the reviewed commit. Do not deploy by cleaning or overwriting the dirty VM original.
-6. Apply only the approved missing migrations through a versioned migration mechanism. Do not seed production data.
-7. Verify schema objects, grants, RLS, function privileges, migration history, and Supabase security advisors.
-8. Build and deploy the API from the verified commit, restart only `nursebridge-api`, then verify local/public health and privacy-safe logs.
-9. Build and deploy the admin application from the same verified commit, restart only `nursebridge-admin`, then verify the protected route and privacy-safe logs.
-10. Run non-mutating smoke preflight first. Run the role-based mutating smoke only with explicit production-smoke approval.
-11. Record deployment commit, migration versions, commands, health results, smoke evidence, and any rollback action.
+1. Review the three absent repository migrations and the compatibility-grants migration as an ordered production change set.
+2. Replay that exact order against the isolated verification project and verify functions, policies, grants, RLS, and advisors. The complete target state has passed isolated verification and must be rechecked immediately before production execution.
+3. Obtain explicit production-migration approval for the reviewed SQL.
+4. Apply each approved change through versioned Supabase migrations; do not edit migration-history rows or seed production data.
+5. Re-run the focused schema/grant queries and advisors. Stop if an expected prerequisite differs or a new security finding appears.
+6. Push the reviewed source commits only after separate push approval.
+7. Create a clean, recoverable deployment checkout or artifact from the reviewed commit. Do not deploy by cleaning or overwriting the dirty VM original.
+8. Deploy API and admin from the same verified commit, restarting only their own services and checking privacy-safe health/log evidence.
+9. Run non-mutating smoke preflight first. Run role-based mutating smoke only with explicit production-smoke approval.
 
 ## Rollback and stop conditions
 
 - Database rollback is forward-only: prepare and review a corrective migration rather than deleting migration-history rows or resetting production.
 - API/admin rollback uses the previous verified source/artifact and restarts only the affected service.
-- Stop if migration history and schema disagree, a prerequisite object differs, a new advisor error appears, a service fails health checks, logs expose private data, or any unrelated VM file would be overwritten.
+- Stop if migration history and schema disagree beyond the documented replayed versions, a prerequisite object differs, a new advisor error appears, a service fails health checks, logs expose private data, or an unrelated VM file would be overwritten.
 - Payments, payouts, archives, TestFlight/App Store actions, production data cleanup, and environment/secret changes remain out of scope.
 
 ## Readiness checks
 
-- Production-sequence readiness guard: passed.
-- Beta-gate guard: passed.
-- Admin/API boundary guard: passed.
-- Access-and-secrets readiness guard: passed.
-- Isolated milestone database replay and security verification: passed.
-- Production migration-history reconciliation: blocked by inactive project.
+- Production project restore and read-only inspection: passed.
+- Production role-override check: passed; no `pgrst.db_schemas` override.
+- Required Milestones 3–5 tables and RLS: passed.
+- Exact migration-order reconciliation and isolated target-state verification: passed.
+- Least-privilege compatibility migration static guard and isolated replay: passed.
+- Isolated effective grants: matched the source-derived allowlist exactly; no anonymous milestone-table privileges remain.
+- Isolated atomic-availability smoke: passed inside a rolled-back transaction after direct table writes were removed.
+- Isolated security advisor after grant hardening: 0 warnings/errors and 3 expected informational no-policy findings on server-only tables.
+- Production database mutation: not performed; separate approval required.
 - Clean production deployment source: not yet prepared.
+
+Supabase reference: [Securing your API](https://supabase.com/docs/guides/api/securing-your-api) explains that object grants and RLS are separate, required layers and recommends explicit least-privilege grants.
