@@ -1,12 +1,12 @@
 # Milestones 3–5 Production Preflight — updated 2026-09-04
 
-Status: **the approved production migrations and forward security correction succeeded; application deployment is blocked by the offline VM**. Production functions, policies, grants, migration history, advisor check, and rolled-back atomic smoke match the verified target state. A clean release checkout passed full verification and production builds. No application deployment or data seeding has been performed.
+Status: **the approved database rollout and application deployment succeeded**. Production functions, policies, grants, migration history, advisor check, rolled-back atomic smoke, API health, and admin availability match the verified target state. No production data seeding or role-based mutating smoke has been performed.
 
 ## Verified source checkpoint
 
 - Local branch: `consolidation/mac-work-20260730T181122Z`
 - Local grant-hardening commit: `1fc3e423518ea11f84227ca8a96c087f8c15294e`
-- GitHub branch tip: `e2a6d67812a871b0f1611222a70ee533109f64a1`
+- Deployment source commit and pre-deployment GitHub branch tip: `2faaef9e2db7309b071d84a3a645f3c3e9b1ed2d`
 - The local checkout contains known generated API, shared-package, and TypeScript build-info output. It remains unstaged and must not be included in a source checkpoint or deployment artifact.
 - The original VM and Mac staging copies remain out of scope and must not be cleaned, reset, overwritten, or used as an unreviewed deployment source.
 
@@ -62,10 +62,26 @@ These results are not a mandate for blanket changes. Client-readable tables can 
 
 ## Required rollout sequence
 
-1. Restore network/SSH reachability to `nursebridge-vm`; do not alter the dirty original checkout while doing so.
-2. Inspect the active service units and deployment paths read-only after reconnection.
-3. Deploy API and admin from commit `8fe3cd47afba5962c4b61546c3a0b9326ff3e56b` using a separate clean VM checkout, restarting only their own services and checking privacy-safe health/log evidence.
+1. Push the reviewed source commits to the consolidation branch only.
+2. Create a clean, recoverable deployment checkout or artifact from the reviewed commit. Do not deploy by cleaning or overwriting the dirty VM original.
+3. Deploy API and admin from the same verified commit, restarting only their own services and checking privacy-safe health/log evidence.
 4. Run non-mutating smoke preflight first. Run role-based mutating smoke only with explicit production-smoke approval.
+
+## Application deployment evidence — 2026-09-05
+
+- Clean VM release checkout: `/home/nurseapp/releases/2faaef9e2db7309b071d84a3a645f3c3e9b1ed2d`
+- Release identity: detached checkout of GitHub commit `2faaef9e2db7309b071d84a3a645f3c3e9b1ed2d`.
+- Frozen dependency installation: passed with pnpm `9.15.0` and Node.js `v20.20.0`.
+- Full repository verification: passed, including type checks and all package and operations tests.
+- Production build: passed; the API TypeScript build and optimized 26-route Next.js admin build completed successfully.
+- Recoverable service-pointer backup: `/home/nurseapp/deploy-backups/20260905T041024Z-2faaef9`.
+- API rollback release: `/home/nurseapp/releases/3233fbcfda069585e84940f6e77918a9b872ffe2`.
+- Admin rollback release: `/home/nurseapp/releases/02570fca209719c4254ad7c12224416990c6fdbb`.
+- API service: active on the new release; local and public `/health` returned HTTP 200; no warning-or-higher journal entries were reported after restart.
+- Admin service: active on the new release; local root returned HTTP 200 and the public root returned the expected Cloudflare Access HTTP 302; no warning-or-higher journal entries were reported after restart.
+- Cloudflare tunnel service: active.
+- The role-based workflow preflight was not run because the script requires short-lived patient, nurse, and admin access tokens even in `--preflight` mode. No tokens were extracted from service environment files. This is the remaining end-to-end verification step.
+- The dirty original VM checkout, Mac staging copy, timestamped backups, service environment files, and database data were not modified by this deployment.
 
 ## Rollback and stop conditions
 
@@ -88,9 +104,10 @@ These results are not a mandate for blanket changes. Client-readable tables can 
 - Production private-helper correction and function-privilege verification: passed.
 - Production atomic-availability smoke: passed inside a rolled-back transaction; existing nurse availability was not persisted or changed.
 - Production security advisor after correction: temporary privileged-public-function warning removed.
-- GitHub consolidation branch: pushed and verified at `8fe3cd47afba5962c4b61546c3a0b9326ff3e56b`; `main` was not changed.
-- Clean local release checkout: `/Users/kossivigbleguede/Documents/Nurse Bridge/nursebridge-release-20260905T035824Z` at detached commit `8fe3cd47afba5962c4b61546c3a0b9326ff3e56b`.
+- GitHub consolidation branch before this evidence update: pushed and verified at `2faaef9e2db7309b071d84a3a645f3c3e9b1ed2d`; `main` was not changed.
+- Clean local release checkout: `/Users/kossivigbleguede/Documents/Nurse Bridge/nursebridge-release-20260905T035824Z` at detached commit `2faaef9e2db7309b071d84a3a645f3c3e9b1ed2d`.
 - Clean release verification: frozen-lockfile install, full `pnpm verify`, and `pnpm build` passed. Shared, API, and admin production builds succeeded.
-- VM deployment: blocked. SSH reports host `192.168.1.111` down; the public API health endpoint returns Cloudflare `530`. The admin hostname returns the expected Cloudflare Access `302`, which does not prove origin health.
+- VM production deployment: passed from a separate clean release. API and admin are active on the same exact commit, local service checks passed, the public API returned HTTP 200, and the public admin returned the expected Cloudflare Access HTTP 302.
+- Role-based non-mutating workflow preflight: pending short-lived patient, nurse, and admin tokens.
 
 Supabase reference: [Securing your API](https://supabase.com/docs/guides/api/securing-your-api) explains that object grants and RLS are separate, required layers and recommends explicit least-privilege grants.
