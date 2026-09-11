@@ -68,29 +68,29 @@ for (const snippet of [
 }
 
 for (const snippet of [
-  "Wire API/admin assignment to the RPC-backed finalizer by default.",
-  "Wire API/admin cancel/complete to the RPC-backed finalizer by default.",
+  "API/admin assignment is wired to the RPC-backed finalizer by default.",
+  "API/admin cancel/complete is wired to the RPC-backed finalizer by default.",
   "Keep admin verification admin-server-only, but keep assignment/cancel/complete on the same API/admin finalizer contracts."
 ]) {
   requireSnippet(betaReadinessDoc, betaReadiness, snippet);
 }
 
 for (const snippet of [
-  "Update API admin assignment and patient application acceptance to use the same RPC-backed finalizer.",
+  "API admin assignment and patient application acceptance use the same RPC-backed finalizer.",
   "Update admin web assignment to call the same canonical finalizer or API endpoint."
 ]) {
   requireSnippet(assignmentPlanDoc, assignmentPlan, snippet);
 }
 
 for (const snippet of [
-  "Update API patient/nurse terminal routes and admin web terminal actions to use the same RPC-backed finalizer."
+  "API patient/nurse terminal routes and admin web terminal actions use the same RPC-backed finalizer."
 ]) {
   requireSnippet(terminalPlanDoc, terminalPlan, snippet);
 }
 
 for (const snippet of [
-  "API/admin command orchestration and assignment atomicity remain open before broader beta.",
-  "Full transaction/RPC-backed assignment is still required before broader beta."
+  "API/admin command orchestration now defaults to RPC-backed assignment and terminal finalizers locally",
+  "live Supabase function apply/exposure and deployment are still required before broader beta."
 ]) {
   requireSnippet(currentStatusDoc, currentStatus, snippet);
 }

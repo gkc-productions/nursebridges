@@ -141,11 +141,11 @@ Status legend:
 - [x] Read-only RPC prerequisite checks exist for assignment and terminal actions.
 - [x] Production canonical assignment field is documented as `jobs.assigned_nurse_user_id`.
 - [x] Reverify live Supabase exposes `jobs.assigned_nurse_user_id` before RPC apply. Verified and backfilled on 2026-09-10; see `docs/release/beta-evidence-log.md`.
-- [ ] Apply and expose `finalize_applied_assignment_rpc` after explicit owner approval.
-- [ ] Wire API/admin assignment to the RPC-backed finalizer by default.
-- [ ] Apply and expose `finalize_terminal_job_rpc` after explicit owner approval.
-- [ ] Wire API/admin cancel/complete to the RPC-backed finalizer by default.
-- [ ] Keep admin verification admin-server-only, but keep assignment/cancel/complete on the same API/admin finalizer contracts.
+- [x] Committed migration creates `finalize_applied_assignment_rpc` and `finalize_terminal_job_rpc`.
+- [x] API/admin assignment is wired to the RPC-backed finalizer by default.
+- [x] API/admin cancel/complete is wired to the RPC-backed finalizer by default.
+- [ ] Apply and expose finalizer RPCs in live Supabase only during an approved deployment window.
+- [x] Keep admin verification admin-server-only, but keep assignment/cancel/complete on the same API/admin finalizer contracts.
 - [ ] Treat guarded multi-write workflow as internal engineering proof only unless the owner signs a written outside-tester exception.
 
 ## Cloudflare Routes

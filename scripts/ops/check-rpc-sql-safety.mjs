@@ -38,6 +38,7 @@ function requireRegex(doc, text, regex, description) {
 
 const assignmentSqlDoc = "docs/architecture/sql/assignment-finalize-rpc.draft.sql";
 const terminalSqlDoc = "docs/architecture/sql/terminal-job-finalize-rpc.draft.sql";
+const migrationDoc = "supabase/migrations/20260911015426_add_atomic_job_finalizers.sql";
 const assignmentPlanDoc = "docs/ops/assignment-rpc-rollout-plan.md";
 const terminalPlanDoc = "docs/ops/terminal-job-rpc-rollout-plan.md";
 const assignmentGuardDoc = "scripts/ops/check-assignment-rpc-contract.mjs";
@@ -45,8 +46,10 @@ const terminalGuardDoc = "scripts/ops/check-terminal-job-rpc-contract.mjs";
 
 const assignmentSql = read(assignmentSqlDoc);
 const terminalSql = read(terminalSqlDoc);
+const migrationSql = read(migrationDoc);
 const assignmentSqlNormalized = normalizeSql(assignmentSql);
 const terminalSqlNormalized = normalizeSql(terminalSql);
+const migrationSqlNormalized = normalizeSql(migrationSql);
 const assignmentPlan = read(assignmentPlanDoc);
 const terminalPlan = read(terminalPlanDoc);
 const assignmentGuard = read(assignmentGuardDoc);
@@ -54,7 +57,8 @@ const terminalGuard = read(terminalGuardDoc);
 
 for (const [doc, text] of [
   [assignmentSqlDoc, assignmentSqlNormalized],
-  [terminalSqlDoc, terminalSqlNormalized]
+  [terminalSqlDoc, terminalSqlNormalized],
+  [migrationDoc, migrationSqlNormalized]
 ]) {
   requireSnippet(doc, text, "language plpgsql");
   requireSnippet(doc, text, "security definer");
@@ -107,6 +111,7 @@ for (const snippet of [
   "'a care request was assigned to another nurse or caregiver.'"
 ]) {
   requireSnippet(assignmentSqlDoc, assignmentSqlNormalized, snippet);
+  requireSnippet(migrationDoc, migrationSqlNormalized, snippet);
 }
 
 for (const snippet of [
@@ -125,11 +130,13 @@ for (const snippet of [
   "v_notification_body := 'a care request is now ' || p_next_status || '.'"
 ]) {
   requireSnippet(terminalSqlDoc, terminalSqlNormalized, snippet);
+  requireSnippet(migrationDoc, migrationSqlNormalized, snippet);
 }
 
 for (const [doc, text] of [
   [assignmentSqlDoc, assignmentSqlNormalized],
-  [terminalSqlDoc, terminalSqlNormalized]
+  [terminalSqlDoc, terminalSqlNormalized],
+  [migrationDoc, migrationSqlNormalized]
 ]) {
   forbidSnippet(doc, text, "grant execute on function public.finalize_applied_assignment_rpc(uuid, uuid, uuid, uuid, text) to anon");
   forbidSnippet(doc, text, "grant execute on function public.finalize_applied_assignment_rpc(uuid, uuid, uuid, uuid, text) to authenticated");

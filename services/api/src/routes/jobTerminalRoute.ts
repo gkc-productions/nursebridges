@@ -11,11 +11,16 @@ import {
   type WorkflowErrorCategory
 } from "../jobWorkflow.js";
 import { markJobCancelledWithClient, markJobCompletedWithClient } from "../jobStatusCore.js";
+import type { FinalizeTerminalJobInput, FinalizeTerminalJobResult } from "../jobTerminalCommand.js";
 
 type TerminalActionDeps = {
   supabaseAdmin: any | null;
   createNotifications(notifications: any[]): Promise<void>;
   writeAdminAuditLog(row: any): Promise<void>;
+  finalizeTerminalJob?: (
+    deps: { supabaseAdmin: any },
+    input: FinalizeTerminalJobInput
+  ) => Promise<FinalizeTerminalJobResult>;
 };
 
 type TerminalRouteDeps = {
@@ -53,6 +58,18 @@ async function notifyJobStatus(
 }
 
 export function createJobTerminalActions(deps: TerminalActionDeps) {
+  async function finalizeWithRpcOrFallback(input: FinalizeTerminalJobInput, fallback: () => Promise<any>) {
+    if (!deps.finalizeTerminalJob) return fallback();
+
+    const { data, error, category } = await deps.finalizeTerminalJob(
+      { supabaseAdmin: deps.supabaseAdmin },
+      input
+    );
+
+    if (error) throw routeError("Unable to update job", category ?? "storage_or_db_error");
+    return data;
+  }
+
   async function fetchAcceptedNurseId(jobId: string) {
     if (!deps.supabaseAdmin) return null;
 
@@ -109,33 +126,44 @@ export function createJobTerminalActions(deps: TerminalActionDeps) {
       applications
     });
 
-    if (plan.rejectAppliedApplications) {
-      const { error: rejectError } = await deps.supabaseAdmin
-        .from("applications")
-        .update({ status: "rejected" })
-        .eq("job_id", jobId)
-        .eq("status", "applied");
+    return finalizeWithRpcOrFallback(
+      {
+        jobId,
+        actorId,
+        actorRole,
+        expectedStatus: job.status,
+        nextStatus: plan.nextStatus
+      },
+      async () => {
+        if (plan.rejectAppliedApplications) {
+          const { error: rejectError } = await deps.supabaseAdmin
+            .from("applications")
+            .update({ status: "rejected" })
+            .eq("job_id", jobId)
+            .eq("status", "applied");
 
-      if (rejectError) throw routeError("Unable to update job", persistenceErrorCategory(rejectError));
-    }
+          if (rejectError) throw routeError("Unable to update job", persistenceErrorCategory(rejectError));
+        }
 
-    const { data, error } = await markJobCancelledWithClient(deps.supabaseAdmin, jobId, job.status);
+        const { data, error } = await markJobCancelledWithClient(deps.supabaseAdmin, jobId, job.status);
 
-    if (error) throw routeError("Unable to update job", persistenceErrorCategory(error));
+        if (error) throw routeError("Unable to update job", persistenceErrorCategory(error));
 
-    await notifyJobStatus(deps, job, plan.nextStatus, plan.notificationNurseUserIds);
+        await notifyJobStatus(deps, job, plan.nextStatus, plan.notificationNurseUserIds);
 
-    if (plan.audit) {
-      await deps.writeAdminAuditLog({
-        actor_id: actorId,
-        action: plan.audit.action,
-        entity_type: "job",
-        entity_id: jobId,
-        metadata: plan.audit.metadata
-      });
-    }
+        if (plan.audit) {
+          await deps.writeAdminAuditLog({
+            actor_id: actorId,
+            action: plan.audit.action,
+            entity_type: "job",
+            entity_id: jobId,
+            metadata: plan.audit.metadata
+          });
+        }
 
-    return data;
+        return data;
+      }
+    );
   }
 
   async function completeJob(jobId: string, actorId: string, actorRole: string) {
@@ -194,23 +222,34 @@ export function createJobTerminalActions(deps: TerminalActionDeps) {
       acceptedNurseUserId
     });
 
-    const { data, error } = await markJobCompletedWithClient(deps.supabaseAdmin, jobId, job.status);
+    return finalizeWithRpcOrFallback(
+      {
+        jobId,
+        actorId,
+        actorRole,
+        expectedStatus: job.status,
+        nextStatus: plan.nextStatus
+      },
+      async () => {
+        const { data, error } = await markJobCompletedWithClient(deps.supabaseAdmin, jobId, job.status);
 
-    if (error) throw routeError("Unable to update job", persistenceErrorCategory(error));
+        if (error) throw routeError("Unable to update job", persistenceErrorCategory(error));
 
-    await notifyJobStatus(deps, job, plan.nextStatus, plan.notificationNurseUserIds);
+        await notifyJobStatus(deps, job, plan.nextStatus, plan.notificationNurseUserIds);
 
-    if (plan.audit) {
-      await deps.writeAdminAuditLog({
-        actor_id: actorId,
-        action: plan.audit.action,
-        entity_type: "job",
-        entity_id: jobId,
-        metadata: plan.audit.metadata
-      });
-    }
+        if (plan.audit) {
+          await deps.writeAdminAuditLog({
+            actor_id: actorId,
+            action: plan.audit.action,
+            entity_type: "job",
+            entity_id: jobId,
+            metadata: plan.audit.metadata
+          });
+        }
 
-    return data;
+        return data;
+      }
+    );
   }
 
   return { cancelJob, completeJob };

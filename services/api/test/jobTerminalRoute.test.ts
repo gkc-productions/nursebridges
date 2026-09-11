@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import Fastify from "fastify";
 import { createJobTerminalActions, registerJobTerminalRoutes } from "../src/routes/jobTerminalRoute.ts";
 import type { Authed } from "../src/auth.ts";
+import type { FinalizeTerminalJobInput, FinalizeTerminalJobResult } from "../src/jobTerminalCommand.ts";
 
 type Operation = {
   table: string;
@@ -68,7 +69,14 @@ function createClient(results: Result[]) {
   };
 }
 
-async function buildApp(options: { actor: Authed; adminResults: Result[] }) {
+async function buildApp(options: {
+  actor: Authed;
+  adminResults: Result[];
+  finalizeTerminalJob?: (
+    deps: { supabaseAdmin: any },
+    input: FinalizeTerminalJobInput
+  ) => Promise<FinalizeTerminalJobResult>;
+}) {
   const app = Fastify({ logger: false });
   const admin = createClient(options.adminResults);
   const notifications: any[] = [];
@@ -81,7 +89,8 @@ async function buildApp(options: { actor: Authed; adminResults: Result[] }) {
     },
     writeAdminAuditLog: async (row: any) => {
       auditRows.push(row);
-    }
+    },
+    finalizeTerminalJob: options.finalizeTerminalJob
   });
 
   await registerJobTerminalRoutes(app, {
@@ -279,6 +288,70 @@ describe("job terminal routes", () => {
 
     assert.equal(response.statusCode, 409);
     assert.deepEqual(response.json(), { error: "Unable to update job" });
+    assert.deepEqual(notifications, []);
+    assert.deepEqual(auditRows, []);
+    await app.close();
+  });
+
+  it("uses the terminal RPC finalizer for cancellation when configured", async () => {
+    const finalizerCalls: FinalizeTerminalJobInput[] = [];
+    const { app, admin, notifications, auditRows } = await buildApp({
+      actor: createUser("admin", "admin-1"),
+      adminResults: [
+        { data: { id: "job-1", status: "open", patient_user_id: "patient-1", title: "Visit" }, error: null },
+        { data: [{ nurse_user_id: "nurse-1", status: "applied" }], error: null }
+      ],
+      finalizeTerminalJob: async (_deps, input) => {
+        finalizerCalls.push(input);
+        return { data: { id: "job-1", status: "cancelled" }, error: null, category: null };
+      }
+    });
+
+    const response = await app.inject({ method: "PATCH", url: "/jobs/job-1/cancel" });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(finalizerCalls, [
+      {
+        jobId: "job-1",
+        actorId: "admin-1",
+        actorRole: "admin",
+        expectedStatus: "open",
+        nextStatus: "cancelled"
+      }
+    ]);
+    assert.equal(admin.operations.filter((operation) => operation.update).length, 0);
+    assert.deepEqual(notifications, []);
+    assert.deepEqual(auditRows, []);
+    await app.close();
+  });
+
+  it("uses the terminal RPC finalizer for completion when configured", async () => {
+    const finalizerCalls: FinalizeTerminalJobInput[] = [];
+    const { app, admin, notifications, auditRows } = await buildApp({
+      actor: createUser("admin", "admin-1"),
+      adminResults: [
+        { data: { id: "job-1", status: "assigned", patient_user_id: "patient-1", title: "Visit" }, error: null },
+        { data: { nurse_user_id: "nurse-1" }, error: null }
+      ],
+      finalizeTerminalJob: async (_deps, input) => {
+        finalizerCalls.push(input);
+        return { data: { id: "job-1", status: "completed" }, error: null, category: null };
+      }
+    });
+
+    const response = await app.inject({ method: "PATCH", url: "/jobs/job-1/complete" });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(finalizerCalls, [
+      {
+        jobId: "job-1",
+        actorId: "admin-1",
+        actorRole: "admin",
+        expectedStatus: "assigned",
+        nextStatus: "completed"
+      }
+    ]);
+    assert.equal(admin.operations.filter((operation) => operation.update).length, 0);
     assert.deepEqual(notifications, []);
     assert.deepEqual(auditRows, []);
     await app.close();

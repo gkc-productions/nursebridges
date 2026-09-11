@@ -1,6 +1,6 @@
 # Terminal Job RPC Rollout Plan
 
-This plan turns NurseBridge cancel/complete persistence from a guarded multi-write sequence into one atomic database operation. It is review-only until the owner explicitly approves a scoped Supabase schema/RPC change.
+This plan turns NurseBridge cancel/complete persistence from a guarded multi-write sequence into one atomic database operation.
 
 ## Why This Matters
 
@@ -28,18 +28,18 @@ Move only the atomic persistence unit into Postgres:
 - write durable in-app notifications;
 - write admin audit evidence when actor is admin.
 
-Draft SQL lives at `docs/architecture/sql/terminal-job-finalize-rpc.draft.sql`.
+Draft SQL lives at `docs/architecture/sql/terminal-job-finalize-rpc.draft.sql`; the committed migration is `supabase/migrations/20260911015426_add_atomic_job_finalizers.sql`.
 
-## Approval Gate
+## Deployment Gate
 
-Do not apply the RPC until a separate owner-approved task explicitly allows:
+Do not apply the migration to a live Supabase project until a separate owner-approved deployment step explicitly allows:
 
 - Supabase function creation or replacement;
 - function grants/revokes;
-- API/admin runtime code path change to call the RPC;
+- API deployment with the RPC-backed finalizer;
 - staging or production verification window.
 
-This plan does not approve live Supabase schema changes by itself.
+This repo change does not approve live Supabase schema changes by itself.
 
 ## Pre-Apply Checklist
 
@@ -66,14 +66,14 @@ Verify security before apply:
 
 After the RPC is approved and applied:
 
-1. Add a terminal persistence adapter that calls `finalize_terminal_job_rpc`.
+1. Use the terminal persistence adapter that calls `finalize_terminal_job_rpc`.
 2. Preserve `@nursebridge/shared/workflow` as the source of truth for terminal eligibility, notification intent, and audit intent.
 3. Map RPC failures into the existing workflow error contract:
    - `job_not_found` -> `not_found`.
    - `invalid_terminal_status`, `invalid_job_transition`, and `accepted_nurse_required` -> `invalid_transition`.
    - `terminal_conflict` or serialization conflict -> `conflict`.
    - unexpected database errors -> `storage_or_db_error`.
-4. Update API patient/nurse terminal routes and admin web terminal actions to use the same RPC-backed finalizer.
+4. API patient/nurse terminal routes and admin web terminal actions use the same RPC-backed finalizer.
 5. Keep push delivery outside the transaction; in-app notification rows are the durable status channel.
 
 ## Verification Plan

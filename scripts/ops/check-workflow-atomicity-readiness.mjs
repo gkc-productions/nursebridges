@@ -52,7 +52,7 @@ for (const snippet of [
   "set job assigned and canonical assigned nurse field",
   "write in-app notifications",
   "write admin audit evidence when actor is admin",
-  "Do not apply the RPC until a separate owner-approved task explicitly allows",
+  "Do not apply the migration to a live Supabase project until a separate owner-approved deployment step explicitly allows",
   "node scripts/ops/check-assignment-rpc-contract.mjs --expect-rpc",
   "Keep push delivery outside the transaction; in-app notification rows are the durable status channel."
 ]) {
@@ -66,7 +66,7 @@ for (const snippet of [
   "set the terminal job status",
   "write durable in-app notifications",
   "write admin audit evidence when actor is admin",
-  "Do not apply the RPC until a separate owner-approved task explicitly allows",
+  "Do not apply the migration to a live Supabase project until a separate owner-approved deployment step explicitly allows",
   "node scripts/ops/check-terminal-job-rpc-contract.mjs --expect-rpc",
   "Keep push delivery outside the transaction; in-app notification rows are the durable status channel."
 ]) {
@@ -88,18 +88,18 @@ for (const snippet of [
   "Review-only assignment RPC design exists.",
   "Review-only terminal job RPC design exists.",
   "Read-only RPC prerequisite checks exist for assignment and terminal actions.",
-  "Apply and expose `finalize_applied_assignment_rpc` after explicit owner approval.",
-  "Wire API/admin assignment to the RPC-backed finalizer by default.",
-  "Apply and expose `finalize_terminal_job_rpc` after explicit owner approval.",
-  "Wire API/admin cancel/complete to the RPC-backed finalizer by default.",
+  "Committed migration creates `finalize_applied_assignment_rpc` and `finalize_terminal_job_rpc`.",
+  "API/admin assignment is wired to the RPC-backed finalizer by default.",
+  "API/admin cancel/complete is wired to the RPC-backed finalizer by default.",
+  "Apply and expose finalizer RPCs in live Supabase only during an approved deployment window.",
   "Treat guarded multi-write workflow as internal engineering proof only unless the owner signs a written outside-tester exception."
 ]) {
   requireSnippet(betaReadinessDoc, betaReadiness, snippet);
 }
 
 for (const snippet of [
-  "Full transaction/RPC-backed assignment is still required before broader beta.",
-  "Full transaction/RPC work remains required"
+  "API/admin command orchestration now defaults to RPC-backed assignment and terminal finalizers locally",
+  "live Supabase function apply/exposure and deployment are still required before broader beta."
 ]) {
   requireSnippet(currentStatusDoc, currentStatus, snippet);
 }

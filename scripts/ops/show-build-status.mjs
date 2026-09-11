@@ -42,7 +42,7 @@ line("Admin", "web dispatcher foundation with assignment/terminal/verification c
 line("API", "Fastify workflow backbone with create-request fix deployed");
 line("Shared workflow", "API/admin/mobile share lifecycle predicates and error categories");
 line("Safety guards", "privacy, logs, mobile secrets, trust language, isolation, beta gates");
-line("Atomicity plan", "assignment and terminal RPC drafts prepared; Supabase apply not approved yet");
+line("Atomicity", "RPC-backed finalizers implemented locally; live apply/deploy gated");
 console.log("");
 
 console.log("Current blockers");

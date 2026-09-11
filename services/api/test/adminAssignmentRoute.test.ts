@@ -242,14 +242,14 @@ describe("admin assignment route", () => {
 
   it("passes admin actor context through the assignment finalizer seam", async () => {
     const finalizerCalls: any[] = [];
-    const { app, assignedJobs } = await buildApp({
+    const { app, assignedJobs, auditRows } = await buildApp({
       adminResults: [
         { data: { id: "job-1", status: "open", title: "Visit" }, error: null },
         { data: [{ id: "app-1", nurse_user_id: "nurse-1", status: "applied" }], error: null }
       ],
       finalizeAssignment: async (_deps, input) => {
         finalizerCalls.push(input);
-        return { error: null, category: null };
+        return { error: null, category: null, finalizedByRpc: true };
       }
     });
 
@@ -261,6 +261,7 @@ describe("admin assignment route", () => {
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(assignedJobs, []);
+    assert.deepEqual(auditRows, []);
     assert.deepEqual(finalizerCalls, [
       {
         jobId: "job-1",

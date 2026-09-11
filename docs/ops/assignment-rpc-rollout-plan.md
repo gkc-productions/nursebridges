@@ -1,6 +1,6 @@
 # Assignment RPC Rollout Plan
 
-This plan turns NurseBridge assignment from a guarded multi-write sequence into one atomic database operation. It is review-only until the owner explicitly approves a scoped Supabase schema/RPC change.
+This plan turns NurseBridge assignment from a guarded multi-write sequence into one atomic database operation.
 
 ## Why This Matters
 
@@ -29,18 +29,18 @@ Move only the atomic persistence unit into Postgres:
 - write in-app notifications;
 - write admin audit evidence when actor is admin.
 
-Draft SQL lives at `docs/architecture/sql/assignment-finalize-rpc.draft.sql`.
+Draft SQL lives at `docs/architecture/sql/assignment-finalize-rpc.draft.sql`; the committed migration is `supabase/migrations/20260911015426_add_atomic_job_finalizers.sql`.
 
-## Approval Gate
+## Deployment Gate
 
-Do not apply the RPC until a separate owner-approved task explicitly allows:
+Do not apply the migration to a live Supabase project until a separate owner-approved deployment step explicitly allows:
 
 - Supabase function creation or replacement;
 - function grants/revokes;
-- API code path change to call the RPC;
+- API deployment with the RPC-backed finalizer;
 - staging or production verification window.
 
-This plan does not approve live Supabase schema changes by itself.
+This repo change does not approve live Supabase schema changes by itself.
 
 ## Pre-Apply Checklist
 
@@ -68,7 +68,7 @@ Verify security before apply:
 
 After the RPC is approved and applied:
 
-1. Add an API/admin assignment persistence adapter that calls `finalize_applied_assignment_rpc`.
+1. Use the API/admin assignment persistence adapter that calls `finalize_applied_assignment_rpc`.
 2. Preserve `@nursebridge/shared/workflow` as the source of truth for request-level planning and error categories.
 3. Map RPC failures into the existing workflow error contract:
    - `job_not_found` and `application_not_found` -> `not_found`.
@@ -76,7 +76,7 @@ After the RPC is approved and applied:
    - `nurse_verification_required` -> `forbidden`.
    - `assignment_conflict` or serialization conflict -> `conflict`.
    - unexpected database errors -> `storage_or_db_error`.
-4. Update API admin assignment and patient application acceptance to use the same RPC-backed finalizer.
+4. API admin assignment and patient application acceptance use the same RPC-backed finalizer.
 5. Update admin web assignment to call the same canonical finalizer or API endpoint.
 6. Keep push delivery outside the transaction; in-app notification rows are the durable status channel.
 

@@ -5,6 +5,7 @@ import { createNotification, createNotifications } from "../notifications.js";
 import { supabaseAdmin, supabaseForUser } from "../supabase.js";
 import { canReceivePrivateLogistics, privateAddressForViewer } from "../jobPrivacy.js";
 import { buildAssignedNurseMap } from "../jobAssignmentView.js";
+import { finalizeTerminalJobWithRpc } from "../jobTerminalCommand.js";
 import { registerJobCreateRoute } from "./jobCreateRoute.js";
 import { registerJobApplyRoute } from "./jobApplyRoute.js";
 import { createJobTerminalActions, registerJobTerminalRoutes } from "./jobTerminalRoute.js";
@@ -145,7 +146,8 @@ export async function jobRoutes(app: FastifyInstance) {
   const terminalActions = createJobTerminalActions({
     supabaseAdmin,
     createNotifications,
-    writeAdminAuditLog
+    writeAdminAuditLog,
+    finalizeTerminalJob: finalizeTerminalJobWithRpc
   });
 
   await registerJobCreateRoute(app, {

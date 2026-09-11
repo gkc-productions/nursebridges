@@ -17,8 +17,8 @@ export type FinalizeAppliedAssignmentInput = {
 };
 
 export type FinalizeAppliedAssignmentResult =
-  | { error: null; category: null }
-  | { error: any; category: WorkflowErrorCategory };
+  | { error: null; category: null; finalizedByRpc?: boolean }
+  | { error: any; category: WorkflowErrorCategory; finalizedByRpc?: boolean };
 
 export type AssignmentFinalizer = (
   deps: AssignmentCommandDeps,
@@ -63,7 +63,7 @@ export async function finalizeAppliedAssignmentWithRpc(
     return { error, category: rpcAssignmentErrorCategory(error) };
   }
 
-  return { error: null, category: null };
+  return { error: null, category: null, finalizedByRpc: true };
 }
 
 export async function finalizeAppliedAssignment(

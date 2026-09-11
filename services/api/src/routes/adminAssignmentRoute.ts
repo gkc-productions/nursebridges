@@ -71,7 +71,7 @@ export async function registerAdminAssignmentRoute(app: FastifyInstance, deps: A
     }
 
     const finalizeAssignment = deps.finalizeAssignment ?? finalizeAppliedAssignment;
-    const { error: assignmentError, category: assignmentErrorCategory } = await finalizeAssignment(
+    const { error: assignmentError, category: assignmentErrorCategory, finalizedByRpc } = await finalizeAssignment(
       {
         supabaseAdmin: deps.supabaseAdmin,
         markJobAssigned: deps.markJobAssigned,
@@ -94,13 +94,15 @@ export async function registerAdminAssignmentRoute(app: FastifyInstance, deps: A
         .send({ error: "Unable to assign job" });
     }
 
-    await deps.writeAdminAuditLog({
-      actor_id: authed.userId,
-      action: assignmentPlan.audit?.action ?? "job_assigned",
-      entity_type: "job",
-      entity_id: body.jobId,
-      metadata: assignmentPlan.audit?.metadata ?? { nurse_user_id: body.nurseUserId }
-    });
+    if (!finalizedByRpc) {
+      await deps.writeAdminAuditLog({
+        actor_id: authed.userId,
+        action: assignmentPlan.audit?.action ?? "job_assigned",
+        entity_type: "job",
+        entity_id: body.jobId,
+        metadata: assignmentPlan.audit?.metadata ?? { nurse_user_id: body.nurseUserId }
+      });
+    }
 
     const sb = deps.supabaseForUser(authed.jwt);
     const { data: updatedJob } = await sb

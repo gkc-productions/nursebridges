@@ -128,7 +128,7 @@ describe("job assignment database writes", () => {
       }
     );
 
-    assert.deepEqual(result, { error: null, category: null });
+    assert.deepEqual(result, { error: null, category: null, finalizedByRpc: true });
     assert.deepEqual(calls, [
       {
         name: "finalize_applied_assignment_rpc",

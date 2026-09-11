@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { writeAdminAuditLog } from "../audit.js";
 import { requireAuth, requireRole } from "../auth.js";
 import { isApprovedNurse, markJobAssigned } from "../jobAssignment.js";
+import { finalizeAppliedAssignmentWithRpc } from "../jobAssignmentCommand.js";
 import { createNotifications } from "../notifications.js";
 import { supabaseAdmin, supabaseForUser } from "../supabase.js";
 import { verifyNurseSchema } from "../validators.js";
@@ -105,6 +106,7 @@ export async function adminRoutes(app: FastifyInstance) {
     isApprovedNurse,
     markJobAssigned,
     createNotifications,
-    writeAdminAuditLog
+    writeAdminAuditLog,
+    finalizeAssignment: finalizeAppliedAssignmentWithRpc
   });
 }

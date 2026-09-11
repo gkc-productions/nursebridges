@@ -35,6 +35,7 @@ describe("quick build status command", () => {
     assert.match(result.stdout, /iPhone workflow\s+patient create -> nurse apply -> admin assign -> nurse complete proven/);
     assert.match(result.stdout, /Android\s+adb installed, no authorized device visible/);
     assert.match(result.stdout, /iPhone\s+signing, installed build, and TestFlight download path proven/);
+    assert.match(result.stdout, /Atomicity\s+RPC-backed finalizers implemented locally; live apply\/deploy gated/);
     assert.match(result.stdout, /Patient release\s+0\.1\.0 \(3\) uploaded; processing and TestFlight device proof pending/);
     assert.match(result.stdout, /wait for NurseBridges 0\.1\.0 \(3\) to finish App Store Connect processing/);
   });
