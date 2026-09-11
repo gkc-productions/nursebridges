@@ -296,9 +296,18 @@ build_create_body() {
 process.stdout.write(JSON.stringify({
   title: process.env.TITLE,
   description: "Automated beta smoke request. Safe to cancel after verification.",
-  address: "Smoke test address",
   start_time: "",
-  hourly_rate: ""
+  logistics: {
+    residence_type: "house",
+    street_address: "100 Smoke Test Way",
+    city: "Atlanta",
+    state: "GA",
+    postal_code: "30303",
+    stairs: "none",
+    mobility_aids: ["none"],
+    transportation_mode: "not_arranged",
+    return_plan: "not_arranged"
+  }
 }));
 NODE
 }
@@ -326,6 +335,59 @@ process.stdout.write(JSON.stringify({
 NODE
 )"
 api_request "${ADMIN_TOKEN}" POST "/admin/jobs/assign" "${assign_body}" >/dev/null
+
+echo "Verifying assigned care cannot be completed before visit documentation..."
+api_request_expect_status "${NURSE_TOKEN}" PATCH "/jobs/${job_id}/complete" "400" >/dev/null
+
+echo "Creating and verifying the in-person arrival PIN..."
+arrival_response="$(api_request "${PATIENT_TOKEN}" POST "/jobs/${job_id}/arrival-pin")"
+arrival_pin="$(json_field "${arrival_response}" "pin")"
+arrival_body="$(ARRIVAL_PIN="${arrival_pin}" node <<'NODE'
+process.stdout.write(JSON.stringify({ pin: process.env.ARRIVAL_PIN }));
+NODE
+)"
+api_request "${NURSE_TOKEN}" POST "/jobs/${job_id}/arrival-pin/verify" "${arrival_body}" >/dev/null
+
+echo "Recording the ordered visit checkpoints through patient handoff..."
+visit_event_body() {
+  local event_type="$1"
+  EVENT_TYPE="${event_type}" node <<'NODE'
+process.stdout.write(JSON.stringify({
+  event_type: process.env.EVENT_TYPE,
+  note: "Automated beta smoke checkpoint. No patient information recorded."
+}));
+NODE
+}
+
+for event_type in \
+  pre_visit_confirmed \
+  en_route \
+  arrived \
+  patient_met \
+  facility_check_in \
+  appointment_started \
+  appointment_ended \
+  return_started \
+  patient_handoff
+do
+  api_request "${NURSE_TOKEN}" POST "/jobs/${job_id}/visit/events" "$(visit_event_body "${event_type}")" >/dev/null
+done
+
+echo "Submitting the required privacy-minimized visit report..."
+visit_report_body="$(node <<'NODE'
+process.stdout.write(JSON.stringify({
+  status: "submitted",
+  visit_summary: "Automated beta smoke visit completed as planned.",
+  provider_instructions: "None provided during this synthetic test.",
+  follow_up_tasks: "None identified during this synthetic test.",
+  transportation_outcome: "Synthetic safe handoff completed."
+}));
+NODE
+)"
+api_request "${NURSE_TOKEN}" PUT "/jobs/${job_id}/visit/report" "${visit_report_body}" >/dev/null
+
+echo "Recording the final visit checkpoint..."
+api_request "${NURSE_TOKEN}" POST "/jobs/${job_id}/visit/events" "$(visit_event_body "visit_completed")" >/dev/null
 
 echo "Completing assigned job as nurse..."
 api_request "${NURSE_TOKEN}" PATCH "/jobs/${job_id}/complete" >/dev/null

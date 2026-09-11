@@ -9,6 +9,27 @@ Use `docs/release/beta-evidence-templates.md` when copying a fresh evidence bloc
 
 ## Engineering Evidence
 
+### Production canonical assignment repair and controlled API workflow smoke
+
+```text
+Date/time: 2026-09-10
+Timezone: America/New_York
+Runner: Codex with explicit owner approval
+Production project: nursebridge main production (project ref bkhxrlvxtzeutdnatgwd)
+Schema repair: Added jobs.assigned_nurse_user_id as the canonical UUID assignment field, added its profiles foreign key and index, and backfilled only jobs with exactly one accepted application.
+Pre-apply check: 10 jobs, 7 accepted applications, 7 jobs with accepted applications, 0 jobs with multiple accepted applications.
+Post-apply check: 7 canonical assignments, 7 matching accepted applications, 0 accepted assignments missing the canonical field.
+API preflight: PASS for health and patient/nurse/admin role sessions.
+Completion request: b475bfc8-6082-4085-a011-976617b7c6c1
+Completion evidence: create 4b130ec9-5d33-4e71-ba0a-0b320c3d7b56; assign 50458172-2d4c-4853-86e4-c8037718d887; arrival verify 8c9d0a07-febc-42b0-91b0-2cf07fde3bd6; report 40c64ba6-651a-4951-86c5-df4658e59a18; complete 0e0d96be-3751-48da-ab72-e0dd1d29f03d.
+Cancellation request: e84b7e0d-2757-4d94-9b3f-922a397e3939
+Cancellation evidence: create c550dcdd-4489-4c61-97be-2cfb99980e23; patient cancel 3a25412a-d95b-42c0-887b-24c38a794e41.
+Guard evidence: Open and undocumented assigned completion returned 400; completed cancellation returned 400; nurse cancellation returned 403; cancelled completion and re-application returned 400; pending cancellation application became rejected.
+Privacy: Synthetic residence, transportation, checkpoint, and report text only. No credentials, tokens, service keys, access PINs, or patient information were recorded.
+Result: PASS for the controlled production API completion and cancellation workflows, including structured logistics, canonical assignment, arrival verification, ordered visit checkpoints, submitted report, terminal transitions, and negative authorization/transition guards.
+Remaining limitation: Real-device patient/nurse surfaces, admin browser actions, in-app notifications, push delivery, and verification-document upload still require separate evidence.
+```
+
 ### Redesigned Patient backend and TestFlight build 3
 
 ```text

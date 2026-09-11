@@ -140,7 +140,7 @@ Status legend:
 - [x] Review-only terminal job RPC design exists.
 - [x] Read-only RPC prerequisite checks exist for assignment and terminal actions.
 - [x] Production canonical assignment field is documented as `jobs.assigned_nurse_user_id`.
-- [ ] Reverify live Supabase exposes `jobs.assigned_nurse_user_id` before RPC apply.
+- [x] Reverify live Supabase exposes `jobs.assigned_nurse_user_id` before RPC apply. Verified and backfilled on 2026-09-10; see `docs/release/beta-evidence-log.md`.
 - [ ] Apply and expose `finalize_applied_assignment_rpc` after explicit owner approval.
 - [ ] Wire API/admin assignment to the RPC-backed finalizer by default.
 - [ ] Apply and expose `finalize_terminal_job_rpc` after explicit owner approval.
@@ -189,7 +189,7 @@ Status legend:
 
 - [blocked] Real-device patient create-job has not yet been proven after the deployed backend fix.
 - [blocked] Android create-job recheck is still required before wider beta unless explicitly deferred by the owner.
-- [blocked] Full patient -> nurse -> admin assignment workflow has not been verified end to end.
+- [blocked] Full patient -> nurse -> admin assignment workflow still needs real-device and admin-browser evidence; the controlled production API completion and cancellation smoke passed on 2026-09-10.
 - [blocked] Real device file upload test.
 - [blocked] Real Expo push delivery test.
 - [blocked] App store build not done.
